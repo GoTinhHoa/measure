@@ -108,23 +108,21 @@ overflow:auto;
 
 .matrix{
 width:100%;
-display:flex;
-justify-content:center;
-align-items:flex-start;
-overflow:hidden;
+overflow-x:auto;
+overflow-y:hidden;
 }
 
 table{
 border-collapse:collapse;
-margin:auto;
-max-width:100%;
+margin:0;
 }
 
 #matrixContainer{
 width:100%;
 display:flex;
-justify-content:center;
+justify-content:flex-start;
 align-items:flex-start;
+overflow-x:auto;
 }
 
 #matrix .card{
@@ -1232,5 +1230,6 @@ navigator.serviceWorker.register("service-worker.js")
 
 </body>
 </html>
+
 
 
