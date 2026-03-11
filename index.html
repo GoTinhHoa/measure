@@ -15,6 +15,8 @@
 
 <title>Đo Gỗ</title>
 
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
 <style>
 
 body{
@@ -96,6 +98,7 @@ color:#166534;
 padding:10px 18px;
 border-radius:10px;
 display:none;
+z-index:99999;
 }
 
 .list{
@@ -157,8 +160,9 @@ gap:6px;
 
 .matrixToolbar{
 display:flex;
-gap:14px;
+gap:10px;
 align-items:center;
+flex-wrap:wrap;
 }
 
 .checkboxRow{
@@ -175,7 +179,7 @@ font-weight:bold;
 margin-top:6px;
 }
 
-/* ACCESS UI */
+/* ACCESS */
 
 #accessScreen{
 position:fixed;
@@ -433,12 +437,18 @@ Số nút mỗi hàng
 
 <button class="smallBtn" onclick="go('measure')">← Quay lại</button>
 
+<button class="smallBtn" onclick="downloadMatrixImage()">Tải ảnh</button>
+
+<button class="smallBtn" onclick="shareMatrixZalo()">Chia sẻ Zalo</button>
+
 <div class="checkboxRow">
 <span>Dạng excel</span>
 <input type="checkbox" id="excelMode" checked onchange="renderMatrix()">
 </div>
 
 </div>
+
+<div id="matrixCaptureArea">
 
 <div class="card">
 
@@ -455,9 +465,25 @@ Số nút mỗi hàng
 
 </div>
 
+</div>
+
 <script>
 
-/* ACCESS CONTROL */
+/* TOAST */
+
+function showToast(msg){
+
+let t=document.getElementById("toast")
+t.innerText=msg
+t.style.display="block"
+
+setTimeout(()=>{
+t.style.display="none"
+},2000)
+
+}
+
+/* ACCESS */
 
 async function fetchAccessList(){
 
@@ -481,7 +507,6 @@ return []
 async function validateAccessCode(code){
 
 let codes=await fetchAccessList()
-
 return codes.includes(code)
 
 }
@@ -528,8 +553,6 @@ input.focus()
 
 }
 
-/* VERIFY SAVED LOGIN */
-
 async function verifySavedAccess(){
 
 let savedCode=localStorage.getItem("woodAccessCode")
@@ -549,7 +572,6 @@ if(!ok){
 localStorage.removeItem("woodAccessCode")
 
 document.getElementById("accessScreen").style.display="flex"
-
 setTimeout(()=>accessInput.focus(),200)
 
 }
@@ -620,7 +642,7 @@ gridCount.innerText=grid
 
 }
 
-/* RESET SETTING */
+/* RESET */
 
 function resetSetting(){
 
@@ -1084,6 +1106,84 @@ matrixContainer.innerHTML=html
 
 }
 
+/* CAPTURE + DOWNLOAD */
+
+async function downloadMatrixImage(){
+
+try{
+
+let el=document.getElementById("matrixCaptureArea")
+
+let table=el.querySelector("table")
+let oldTransform=table?table.style.transform:""
+
+if(table)table.style.transform="scale(1)"
+
+let canvas=await html2canvas(el,{scale:3})
+
+if(table)table.style.transform=oldTransform
+
+let link=document.createElement("a")
+link.download="matrix.png"
+link.href=canvas.toDataURL("image/png")
+link.click()
+
+showToast("Đã lưu ảnh")
+
+}catch(e){
+
+showToast("Lưu ảnh thất bại")
+
+}
+
+}
+
+/* SHARE */
+
+async function shareMatrixZalo(){
+
+try{
+
+let el=document.getElementById("matrixCaptureArea")
+
+let table=el.querySelector("table")
+let oldTransform=table?table.style.transform:""
+
+if(table)table.style.transform="scale(1)"
+
+let canvas=await html2canvas(el,{scale:3})
+
+if(table)table.style.transform=oldTransform
+
+canvas.toBlob(async function(blob){
+
+let file=new File([blob],"matrix.png",{type:"image/png"})
+
+if(navigator.share){
+
+await navigator.share({
+files:[file],
+title:"Matrix quy cách gỗ"
+})
+
+showToast("Chia sẻ thành công")
+
+}else{
+
+showToast("Thiết bị không hỗ trợ chia sẻ")
+
+}
+
+})
+
+}catch(e){
+
+showToast("Chia sẻ thất bại")
+
+}
+
+}
+
 /* LOAD */
 
 window.addEventListener("load",async function(){
@@ -1116,4 +1216,3 @@ navigator.serviceWorker.register("service-worker.js")
 
 </body>
 </html>
-
