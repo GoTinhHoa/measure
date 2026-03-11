@@ -13,11 +13,15 @@
 <meta name="apple-mobile-web-app-title" content="Đo Gỗ">
 <link rel="apple-touch-icon" href="icon-192.png">
 
-<title>Đo gỗ</title>
+<title>Đo Gỗ</title>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
 <style>
+
+*{
+box-sizing:border-box;
+}
 
 body{
 margin:0;
@@ -106,28 +110,34 @@ max-height:220px;
 overflow:auto;
 }
 
+/* MATRIX FIX */
+
 .matrix{
 width:100%;
 overflow-x:auto;
 overflow-y:hidden;
-}
-
-table{
-border-collapse:collapse;
-margin:0;
+padding:0;
 }
 
 #matrixContainer{
 width:100%;
-display:flex;
-justify-content:flex-start;
-align-items:flex-start;
+display:block;
 overflow-x:auto;
+padding:0;
+}
+
+#matrixContainer.card{
+padding:0;
 }
 
 #matrix .card{
 height:auto;
 min-height:unset;
+}
+
+table{
+border-collapse:collapse;
+margin:0;
 }
 
 td,th{
@@ -1021,7 +1031,7 @@ maxHeight/table.scrollHeight
 
 if(scale<1){
 table.style.transform="scale("+scale+")"
-table.style.transformOrigin="top center"
+table.style.transformOrigin="top left"
 }
 
 }
@@ -1230,7 +1240,3 @@ navigator.serviceWorker.register("service-worker.js")
 
 </body>
 </html>
-
-
-
-
