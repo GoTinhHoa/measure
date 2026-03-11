@@ -175,12 +175,108 @@ font-weight:bold;
 margin-top:6px;
 }
 
+/* ACCESS UI */
+
+#accessScreen{
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:linear-gradient(180deg,#1e293b,#0f172a);
+display:none;
+align-items:center;
+justify-content:center;
+z-index:9999;
+}
+
+.accessCard{
+background:white;
+padding:28px;
+border-radius:16px;
+width:300px;
+text-align:center;
+box-shadow:0 10px 30px rgba(0,0,0,0.25);
+}
+
+.accessTitle{
+font-size:20px;
+font-weight:600;
+margin-bottom:12px;
+}
+
+.accessDesc{
+font-size:14px;
+color:#555;
+margin-bottom:18px;
+}
+
+.accessInput{
+width:100%;
+padding:10px;
+font-size:16px;
+border-radius:10px;
+border:2px solid #e2e8f0;
+outline:none;
+text-align:center;
+}
+
+.accessInput:focus{
+border-color:#2563eb;
+}
+
+.accessBtn{
+margin-top:14px;
+width:100%;
+background:#2563eb;
+}
+
+.accessError{
+margin-top:10px;
+color:#dc2626;
+font-size:14px;
+min-height:18px;
+}
+
+.accessLoading{
+font-size:13px;
+color:#555;
+margin-top:6px;
+min-height:18px;
+}
+
 </style>
 </head>
 
 <body>
 
 <div id="toast" class="toast"></div>
+
+<!-- ACCESS SCREEN -->
+
+<div id="accessScreen">
+
+<div class="accessCard">
+
+<div class="accessTitle">Truy cập ứng dụng</div>
+
+<div class="accessDesc">
+Nhập mã truy cập để sử dụng ứng dụng
+</div>
+
+<input id="accessInput" class="accessInput" placeholder="Nhập mã truy cập">
+
+<button id="accessBtn" class="accessBtn" onclick="checkAccessCode()">
+Xác nhận
+</button>
+
+<div id="accessLoading" class="accessLoading"></div>
+
+<div id="accessError" class="accessError"></div>
+
+</div>
+
+</div>
 
 <!-- SETUP -->
 
@@ -360,6 +456,105 @@ Số nút mỗi hàng
 </div>
 
 <script>
+
+/* ACCESS CONTROL */
+
+async function fetchAccessList(){
+
+try{
+
+let res=await fetch("device.json?ts="+Date.now())
+let data=await res.json()
+
+if(!data || !data.codes) return []
+
+return data.codes
+
+}catch(e){
+
+return []
+
+}
+
+}
+
+async function validateAccessCode(code){
+
+let codes=await fetchAccessList()
+
+return codes.includes(code)
+
+}
+
+async function checkAccessCode(){
+
+let input=document.getElementById("accessInput")
+let btn=document.getElementById("accessBtn")
+let error=document.getElementById("accessError")
+let loading=document.getElementById("accessLoading")
+
+let code=input.value.trim()
+
+if(!code){
+error.innerText="Vui lòng nhập mã truy cập"
+return
+}
+
+btn.disabled=true
+loading.innerText="Đang kiểm tra..."
+error.innerText=""
+
+let ok=await validateAccessCode(code)
+
+btn.disabled=false
+loading.innerText=""
+
+if(ok){
+
+localStorage.setItem("woodAccessCode",code)
+document.getElementById("accessScreen").style.display="none"
+
+}else{
+
+error.innerText="Mã không hợp lệ"
+
+if(navigator.vibrate){
+navigator.vibrate(200)
+}
+
+input.focus()
+
+}
+
+}
+
+/* VERIFY SAVED LOGIN */
+
+async function verifySavedAccess(){
+
+let savedCode=localStorage.getItem("woodAccessCode")
+
+if(!savedCode){
+
+document.getElementById("accessScreen").style.display="flex"
+setTimeout(()=>accessInput.focus(),200)
+return
+
+}
+
+let ok=await validateAccessCode(savedCode)
+
+if(!ok){
+
+localStorage.removeItem("woodAccessCode")
+
+document.getElementById("accessScreen").style.display="flex"
+
+setTimeout(()=>accessInput.focus(),200)
+
+}
+
+}
 
 /* STATE */
 
@@ -889,9 +1084,17 @@ matrixContainer.innerHTML=html
 
 }
 
-/* LOAD STATE WHEN APP START */
+/* LOAD */
 
-window.addEventListener("load",function(){
+window.addEventListener("load",async function(){
+
+await verifySavedAccess()
+
+accessInput.addEventListener("keypress",function(e){
+if(e.key==="Enter"){
+checkAccessCode()
+}
+})
 
 loadState()
 rebuild()
@@ -912,6 +1115,4 @@ navigator.serviceWorker.register("service-worker.js")
 </script>
 
 </body>
-
 </html>
-
