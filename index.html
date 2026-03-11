@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e293b">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Đo Quy Cách Gỗ</title>
+
+<style>
+
+body{
+margin:0;
+font-family:-apple-system,BlinkMacSystemFont,Inter,Arial;
+background:#f5f7fa;
+}
+
+.noZoom{
+touch-action:manipulation;
+}
+
+.header{
+background:#1e293b;
+color:white;
+padding:14px;
+text-align:center;
+font-weight:600;
+}
+
+.screen{display:none;padding:12px}
+.active{display:block}
+
+.card{
+background:white;
+border-radius:14px;
+padding:12px;
+margin-bottom:10px;
+box-shadow:0 4px 12px rgba(0,0,0,0.08);
+}
+
+button{
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:18px;
+background:#2563eb;
+color:white;
+}
+
+.smallBtn{
+background:#e2e8f0;
+color:black;
+padding:6px 10px;
+font-size:16px;
+}
+
+.grid{
+display:grid;
+gap:6px;
+margin-top:6px;
+}
+
+.grid button{
+background:white;
+color:black;
+border:1px solid #e2e8f0;
+font-size:18px;
+padding:12px;
+}
+
+.selected{
+background:#22c55e!important;
+color:white!important;
+}
+
+.disabled{
+opacity:0.3;
+pointer-events:none;
+}
+
+.toast{
+position:fixed;
+top:20px;
+left:50%;
+transform:translateX(-50%);
+background:#dcfce7;
+color:#166534;
+padding:10px 18px;
+border-radius:10px;
+display:none;
+}
+
+.list{
+max-height:220px;
+overflow:auto;
+}
+
+.matrix{
+overflow:hidden;
+width:100%;
+}
+
+table{
+border-collapse:collapse;
+margin:auto;
+}
+
+td,th{
+border:1px solid #ddd;
+width:42px;
+height:42px;
+text-align:center;
+font-size:12px;
+}
+
+th{background:#f1f5f9;}
+
+.formGrid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:16px 20px;
+}
+
+input{
+width:100%;
+padding:8px;
+border-radius:8px;
+border:1px solid #ccc;
+font-size:16px;
+}
+
+.panelHeader{
+display:flex;
+align-items:center;
+justify-content:space-between;
+margin-bottom:4px;
+}
+
+.rangeGroup{
+display:flex;
+gap:20px;
+}
+
+.rangeControl{
+display:flex;
+align-items:center;
+gap:6px;
+}
+
+.matrixToolbar{
+display:flex;
+gap:14px;
+align-items:center;
+}
+
+.checkboxRow{
+display:flex;
+align-items:center;
+gap:6px;
+white-space:nowrap;
+}
+
+.matrixStats{
+display:flex;
+gap:20px;
+font-weight:bold;
+margin-top:6px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="toast" class="toast"></div>
+
+<!-- SETUP -->
+
+<div id="setup" class="screen active noZoom">
+
+<div class="header">Cấu hình kiện</div>
+
+<div class="card">
+
+<div class="formGrid">
+
+<div>
+Mã kiện<br>
+<input id="bundle" oninput="this.value=this.value.toUpperCase()">
+</div>
+
+<div>
+Loại gỗ<br>
+<input id="woodType" oninput="this.value=this.value.toUpperCase()">
+</div>
+
+<div>
+Độ dày (cm)<br>
+<input id="thickness" type="number" step="any">
+</div>
+
+<div>
+Chất lượng<br>
+<input id="quality" oninput="this.value=this.value.toUpperCase()">
+</div>
+
+</div>
+
+<br>
+
+<div class="checkboxRow">
+<span>Gỗ Mỹ</span>
+<input type="checkbox" id="woodUS" onchange="toggleWoodUS()">
+</div>
+
+<br>
+
+Số nút mỗi hàng
+
+<br>
+
+<button class="smallBtn" onclick="gridMinus()">-</button>
+<span id="gridCount">6</span>
+<button class="smallBtn" onclick="gridPlus()">+</button>
+
+<br><br>
+
+<button class="smallBtn" onclick="resetSetting()">Reset</button>
+
+</div>
+
+<button onclick="startMeasure()">Bắt đầu nhập</button>
+
+</div>
+
+<!-- MEASURE -->
+
+<div id="measure" class="screen noZoom">
+
+<div class="header">
+<span id="headerInfo"></span>
+</div>
+
+<div class="card">
+
+<button class="smallBtn" onclick="go('setup')">← Cấu hình</button>
+<button class="smallBtn" onclick="resetBoards()">Reset</button>
+<button class="smallBtn" onclick="undo()">Undo</button>
+<button onclick="showMatrix()">Matrix</button>
+
+</div>
+
+<div class="card">
+<b id="summary"></b>
+</div>
+
+<div class="card">
+
+<div class="panelHeader">
+
+<b>Dài (dm)</b>
+
+<div class="rangeGroup">
+
+<div class="rangeControl">
+<button class="smallBtn" onclick="lenMin--; rebuild(); saveState()">-</button>
+<span id="lenMinLabel"></span>
+<button class="smallBtn" onclick="lenMin++; rebuild(); saveState()">+</button>
+</div>
+
+<div class="rangeControl">
+<button class="smallBtn" onclick="lenMax--; rebuild(); saveState()">-</button>
+<span id="lenMaxLabel"></span>
+<button class="smallBtn" onclick="lenMax++; rebuild(); saveState()">+</button>
+</div>
+
+</div>
+
+</div>
+
+<div id="lengthGrid" class="grid"></div>
+
+</div>
+
+<div class="card">
+
+<div class="panelHeader">
+
+<b>Rộng (cm)</b>
+
+<div class="rangeGroup">
+
+<div class="rangeControl">
+<button class="smallBtn" onclick="widMin--; rebuild(); saveState()">-</button>
+<span id="widMinLabel"></span>
+<button class="smallBtn" onclick="widMin++; rebuild(); saveState()">+</button>
+</div>
+
+<div class="rangeControl">
+<button class="smallBtn" onclick="widMax--; rebuild(); saveState()">-</button>
+<span id="widMaxLabel"></span>
+<button class="smallBtn" onclick="widMax++; rebuild(); saveState()">+</button>
+</div>
+
+</div>
+
+</div>
+
+<div id="widthGrid" class="grid disabled"></div>
+
+</div>
+
+<div class="card">
+
+<b>Danh sách tấm đã nhập</b>
+<div id="boardList" class="list"></div>
+
+</div>
+
+</div>
+
+<!-- MATRIX -->
+
+<div id="matrix" class="screen">
+
+<div class="header">Ma trận quy cách</div>
+
+<div class="card matrixToolbar">
+
+<button class="smallBtn" onclick="go('measure')">← Quay lại</button>
+
+<div class="checkboxRow">
+<span>Dạng excel</span>
+<input type="checkbox" id="excelMode" checked onchange="renderMatrix()">
+</div>
+
+</div>
+
+<div class="card">
+
+<div id="matrixHeader"></div>
+
+<div class="matrixStats">
+<span id="matrixPieces"></span>
+<span id="matrixVolume"></span>
+</div>
+
+</div>
+
+<div class="matrix card" id="matrixContainer"></div>
+
+</div>
+
+<script>
+
+/* STATE */
+
+let boards=[]
+let selectedLength=null
+let grid=6
+
+let lenMin=20
+let lenMax=35
+let widMin=15
+let widMax=35
+
+let woodUS=false
+
+/* LOCAL STORAGE */
+
+function saveState(){
+
+let state={
+boards:boards,
+grid:grid,
+lenMin:lenMin,
+lenMax:lenMax,
+widMin:widMin,
+widMax:widMax,
+woodUS:woodUS,
+bundle:bundle.value,
+woodType:woodType.value,
+thickness:thickness.value,
+quality:quality.value
+}
+
+localStorage.setItem("woodMeasureState",JSON.stringify(state))
+
+}
+
+function loadState(){
+
+let raw=localStorage.getItem("woodMeasureState")
+if(!raw)return
+
+try{
+
+let state=JSON.parse(raw)
+
+boards=state.boards||[]
+grid=state.grid||6
+lenMin=state.lenMin||20
+lenMax=state.lenMax||35
+widMin=state.widMin||15
+widMax=state.widMax||35
+woodUS=state.woodUS||false
+
+bundle.value=state.bundle||""
+woodType.value=state.woodType||""
+thickness.value=state.thickness||""
+quality.value=state.quality||""
+
+document.getElementById("woodUS").checked=woodUS
+gridCount.innerText=grid
+
+}catch(e){}
+
+}
+
+/* RESET SETTING */
+
+function resetSetting(){
+
+bundle.value=""
+woodType.value=""
+quality.value=""
+thickness.value=""
+
+boards=[]
+
+document.getElementById("woodUS").checked=false
+woodUS=false
+
+updateSummary()
+renderList()
+saveState()
+
+}
+
+/* NAV */
+
+function go(screen){
+
+document.querySelectorAll(".screen").forEach(s=>{
+s.classList.remove("active")
+})
+
+document.getElementById(screen).classList.add("active")
+
+}
+
+/* SPEAK */
+
+function speakNumber(n){
+
+if(!window.speechSynthesis) return
+
+speechSynthesis.cancel()
+
+const digits=[
+"không","một","hai","ba","bốn",
+"năm","sáu","bảy","tám","chín"
+]
+
+function readInt(num){
+
+if(num<10) return digits[num]
+
+if(num==10) return "mười"
+
+if(num<20){
+return "mười "+digits[num%10]
+}
+
+let tens=Math.floor(num/10)
+let unit=num%10
+
+if(unit==0) return digits[tens]+" mươi"
+
+if(unit==1) return digits[tens]+" mốt"
+
+return digits[tens]+" "+digits[unit]
+
+}
+
+let text=""
+
+let s=n.toString()
+
+if(s.includes(".")){
+
+let parts=s.split(".")
+
+text = readInt(parseInt(parts[0])) + " phẩy " +
+parts[1].split("").map(d=>digits[d]).join(" ")
+
+}else{
+
+text = readInt(parseInt(s))
+
+}
+
+let utter=new SpeechSynthesisUtterance(text)
+utter.lang="vi-VN"
+utter.rate=1.3
+
+speechSynthesis.speak(utter)
+
+}
+
+/* GRID */
+
+function gridMinus(){if(grid>4)grid--;gridCount.innerText=grid;saveState()}
+function gridPlus(){if(grid<8)grid++;gridCount.innerText=grid;saveState()}
+
+/* WOOD US */
+
+function toggleWoodUS(){
+
+woodUS=document.getElementById("woodUS").checked
+
+if(woodUS){
+
+lenMin=22
+lenMax=25
+widMin=15
+widMax=25
+
+}else{
+
+lenMin=20
+lenMax=35
+widMin=15
+widMax=35
+
+}
+
+saveState()
+
+}
+
+/* START */
+
+function startMeasure(){
+
+if(bundle.value.trim()==""){
+alert("Vui lòng nhập mã kiện")
+bundle.focus()
+return
+}
+
+if(thickness.value.trim()==""){
+alert("Vui lòng nhập độ dày")
+thickness.focus()
+return
+}
+
+if(isNaN(thickness.value)){
+alert("Độ dày phải là số")
+thickness.focus()
+return
+}
+
+updateHeader()
+rebuild()
+
+go("measure")
+
+updateSummary()
+renderList()
+saveState()
+
+}
+
+/* HEADER */
+
+function updateHeader(){
+
+let info=[bundle.value,woodType.value,thickness.value+"cm",quality.value]
+.filter(v=>v!="")
+.join(" • ")
+
+headerInfo.innerText=info
+
+}
+
+/* BUILD GRID */
+
+function rebuild(){
+
+lenMinLabel.innerText=lenMin
+lenMaxLabel.innerText=lenMax
+widMinLabel.innerText=widMin
+widMaxLabel.innerText=widMax
+
+createButtons()
+
+saveState()
+
+}
+
+function createButtons(){
+
+lengthGrid.innerHTML=""
+widthGrid.innerHTML=""
+
+lengthGrid.style.gridTemplateColumns="repeat("+grid+",1fr)"
+widthGrid.style.gridTemplateColumns="repeat("+grid+",1fr)"
+
+let lengths=[]
+
+for(let i=lenMin;i<=lenMax;i++){
+
+lengths.push(i)
+
+if(woodUS){
+
+lengths.push(Number((i+0.3).toFixed(1)))
+lengths.push(Number((i+0.5).toFixed(1)))
+lengths.push(Number((i+0.7).toFixed(1)))
+
+}
+
+}
+
+lengths.forEach(v=>{
+
+let b=document.createElement("button")
+b.innerText=v
+
+b.onclick=()=>{
+
+speakNumber(v)
+
+selectedLength=v
+
+document.querySelectorAll("#lengthGrid button")
+.forEach(x=>x.classList.remove("selected"))
+
+b.classList.add("selected")
+
+widthGrid.classList.remove("disabled")
+
+}
+
+lengthGrid.appendChild(b)
+
+})
+
+let widths=[]
+
+for(let i=widMin;i<=widMax;i++){
+
+widths.push(i)
+
+if(woodUS){
+widths.push(Number((i+0.5).toFixed(1)))
+}
+
+}
+
+widths.forEach(v=>{
+
+let b=document.createElement("button")
+b.innerText=v
+
+b.onclick=()=>{
+
+if(selectedLength==null)return
+
+speakNumber(v)
+
+boards.push({l:selectedLength,w:v})
+
+selectedLength=null
+
+document.querySelectorAll("#lengthGrid button")
+.forEach(x=>x.classList.remove("selected"))
+
+widthGrid.classList.add("disabled")
+
+updateSummary()
+renderList()
+saveState()
+
+}
+
+widthGrid.appendChild(b)
+
+})
+
+}
+
+/* SUMMARY */
+
+function updateSummary(){
+
+let vol=0
+
+boards.forEach(b=>{
+vol+=(b.l/10)*(b.w/100)*(thickness.value/100)
+})
+
+summary.innerText=boards.length+" tấm • "+vol.toFixed(4)+" m³"
+
+}
+
+/* LIST */
+
+function renderList(){
+
+boardList.innerHTML=""
+
+boards.slice().reverse().forEach((b,i)=>{
+
+let d=document.createElement("div")
+
+d.innerHTML=b.l+" x "+b.w+
+" <button onclick='deleteBoard("+i+")'>x</button>"
+
+boardList.appendChild(d)
+
+})
+
+}
+
+function deleteBoard(i){
+
+boards.splice(boards.length-1-i,1)
+
+updateSummary()
+renderList()
+saveState()
+
+}
+
+function resetBoards(){boards=[];updateSummary();renderList();saveState()}
+function undo(){boards.pop();updateSummary();renderList();saveState()}
+
+/* MATRIX */
+
+function showMatrix(){
+
+updateMatrixHeader()
+renderMatrix()
+
+go("matrix")
+
+}
+
+function updateMatrixHeader(){
+
+let vol=0
+
+boards.forEach(b=>{
+vol+=(b.l/10)*(b.w/100)*(thickness.value/100)
+})
+
+let info=[bundle.value,woodType.value,thickness.value+"cm",quality.value]
+.filter(v=>v!="")
+.join(" • ")
+
+matrixHeader.innerText=info
+matrixPieces.innerText=boards.length+" tấm"
+matrixVolume.innerText=vol.toFixed(4)+" m³"
+
+}
+
+function autoScaleMatrix(){
+
+let container=document.getElementById("matrixContainer")
+let table=container.querySelector("table")
+
+if(!table)return
+
+let maxHeight=window.innerHeight*0.75
+
+let scale=Math.min(
+container.clientWidth/table.scrollWidth,
+maxHeight/table.scrollHeight
+)
+
+if(scale<1){
+table.style.transform="scale("+scale+")"
+table.style.transformOrigin="top center"
+}
+
+}
+
+function renderMatrix(){
+
+if(excelMode.checked) renderExcelMatrix()
+else renderHeatmap()
+
+setTimeout(autoScaleMatrix,50)
+
+}
+
+/* HEATMAP */
+
+function renderHeatmap(){
+
+let map={}
+
+boards.forEach(b=>{
+let key=b.w+"_"+b.l
+map[key]=(map[key]||0)+1
+})
+
+let widths=[...new Set(boards.map(b=>b.w))].sort((a,b)=>a-b)
+let lengths=[...new Set(boards.map(b=>b.l))].sort((a,b)=>a-b)
+
+let html="<table><tr><th>Rộng \\ Dài</th>"
+
+lengths.forEach(l=>html+="<th>"+l+"</th>")
+html+="</tr>"
+
+widths.forEach(w=>{
+html+="<tr><th>"+w+"</th>"
+lengths.forEach(l=>{
+let v=map[w+"_"+l]||0
+let color=v==0?"white":v==1?"#dcfce7":v==2?"#86efac":"#22c55e"
+html+="<td style='background:"+color+"'>"+v+"</td>"
+})
+html+="</tr>"
+})
+
+html+="</table>"
+
+matrixContainer.innerHTML=html
+
+}
+
+/* EXCEL */
+
+function renderExcelMatrix(){
+
+let groups={}
+
+boards.forEach(b=>{
+if(!groups[b.l])groups[b.l]=[]
+groups[b.l].push(b.w)
+})
+
+let lengths=Object.keys(groups).sort((a,b)=>a-b)
+
+lengths.forEach(l=>groups[l].sort((a,b)=>a-b))
+
+let columns=[]
+
+lengths.forEach(l=>{
+let arr=groups[l]
+for(let i=0;i<arr.length;i+=10){
+columns.push({length:l,values:arr.slice(i,i+10)})
+}
+})
+
+let html="<table><tr>"
+
+columns.forEach(c=>{
+html+="<th>"+c.length+"</th>"
+})
+
+html+="</tr>"
+
+for(let r=0;r<10;r++){
+
+html+="<tr>"
+
+columns.forEach(c=>{
+html+="<td>"+(c.values[r]||"")+"</td>"
+})
+
+html+="</tr>"
+
+}
+
+html+="</table>"
+
+matrixContainer.innerHTML=html
+
+}
+
+/* LOAD STATE WHEN APP START */
+
+window.addEventListener("load",function(){
+
+loadState()
+rebuild()
+updateSummary()
+renderList()
+
+})
+
+</script>
+
+<script>
+
+if ("serviceWorker" in navigator) {
+navigator.serviceWorker.register("service-worker.js")
+.then(()=>console.log("PWA ready"));
+}
+
+</script>
+
+</body>
+</html>
