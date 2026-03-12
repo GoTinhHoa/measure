@@ -1155,7 +1155,7 @@ if(w) sumWidth+=Number(w)
 
 let total=c.length*sumWidth*thickness.value
 
-html+="<th style='font-size:50%;font-weight:bold'>"+(sumWidth?total:"")+"</th>"
+html+="<th style='font-size:50%;font-weight:bold'>"+(sumWidth?total.toFixed(0):"")+"</th>"
 
 })
 
@@ -1340,3 +1340,4 @@ originalGoFunction(screen)
 </script>
 </body>
 </html>
+
