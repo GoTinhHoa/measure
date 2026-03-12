@@ -280,6 +280,33 @@ margin-top:6px;
 min-height:18px;
 }
 
+/* ===== MATRIX LANDSCAPE MOBILE ONLY ===== */
+
+#rotateDeviceNotice{
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+background:#0f172a;
+color:white;
+display:none;
+align-items:center;
+justify-content:center;
+text-align:center;
+z-index:99999;
+padding:30px;
+font-size:20px;
+font-weight:600;
+}
+
+#rotateDeviceNotice span{
+display:block;
+font-size:16px;
+opacity:0.8;
+margin-top:10px;
+}
+
 </style>
 </head>
 
@@ -1087,57 +1114,6 @@ matrixContainer.innerHTML=html
 
 }
 
-/* EXCEL */
-/*
-function renderExcelMatrix(){
-
-let groups={}
-
-boards.forEach(b=>{
-if(!groups[b.l])groups[b.l]=[]
-groups[b.l].push(b.w)
-})
-
-let lengths=Object.keys(groups).sort((a,b)=>a-b)
-
-lengths.forEach(l=>groups[l].sort((a,b)=>a-b))
-
-let columns=[]
-
-lengths.forEach(l=>{
-let arr=groups[l]
-for(let i=0;i<arr.length;i+=10){
-columns.push({length:l,values:arr.slice(i,i+10)})
-}
-})
-
-let html="<table><tr>"
-
-columns.forEach(c=>{
-html+="<th>"+c.length+"</th>"
-})
-
-html+="</tr>"
-
-for(let r=0;r<10;r++){
-
-html+="<tr>"
-
-columns.forEach(c=>{
-html+="<td>"+(c.values[r]||"")+"</td>"
-})
-
-html+="</tr>"
-
-}
-
-html+="</table>"
-
-matrixContainer.innerHTML=html
-
-}
-*/
-
 function renderExcelMatrix(){
 
 let groups={}
@@ -1206,7 +1182,7 @@ if(w) sumWidth+=Number(w)
 
 let total=c.length*sumWidth*thickness.value
 
-html+="<td style='font-size:60%;font-weight:bold'>"+(sumWidth?total:"")+"</td>"
+html+="<th style='font-size:50%;font-weight:bold'>"+(sumWidth?total:"")+"</th>"
 
 })
 
@@ -1325,6 +1301,61 @@ navigator.serviceWorker.register("service-worker.js")
 
 </script>
 
+<!-- ROTATE DEVICE NOTICE -->
+
+<div id="rotateDeviceNotice">
+<div>
+Vui lòng xoay ngang điện thoại
+<span>Màn hình Matrix chỉ hỗ trợ chế độ ngang</span>
+</div>
+</div>
+
+<script>
+
+/* ===== MATRIX LANDSCAPE CONTROL ===== */
+
+function checkMatrixOrientation(){
+
+let matrixScreen=document.getElementById("matrix")
+let notice=document.getElementById("rotateDeviceNotice")
+
+if(!matrixScreen.classList.contains("active")){
+notice.style.display="none"
+return
+}
+
+let isMobile=window.innerWidth<900
+
+if(!isMobile){
+notice.style.display="none"
+return
+}
+
+let portrait=window.innerHeight>window.innerWidth
+
+if(portrait){
+notice.style.display="flex"
+}else{
+notice.style.display="none"
+}
+
+}
+
+window.addEventListener("resize",checkMatrixOrientation)
+window.addEventListener("orientationchange",checkMatrixOrientation)
+
+/* hook khi chuyển màn hình */
+
+const originalGo=go
+go=function(screen){
+
+originalGo(screen)
+
+setTimeout(checkMatrixOrientation,50)
+
+}
+
+</script>
+
 </body>
 </html>
-
