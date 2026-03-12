@@ -280,33 +280,6 @@ margin-top:6px;
 min-height:18px;
 }
 
-/* ===== MATRIX LANDSCAPE MOBILE ONLY ===== */
-
-#rotateDeviceNotice{
-position:fixed;
-top:0;
-left:0;
-right:0;
-bottom:0;
-background:#0f172a;
-color:white;
-display:none;
-align-items:center;
-justify-content:center;
-text-align:center;
-z-index:99999;
-padding:30px;
-font-size:20px;
-font-weight:600;
-}
-
-#rotateDeviceNotice span{
-display:block;
-font-size:16px;
-opacity:0.8;
-margin-top:10px;
-}
-
 </style>
 </head>
 
@@ -1300,62 +1273,70 @@ navigator.serviceWorker.register("service-worker.js")
 }
 
 </script>
-
-<!-- ROTATE DEVICE NOTICE -->
-
-<div id="rotateDeviceNotice">
-<div>
-Vui lòng xoay ngang điện thoại
-<span>Màn hình Matrix chỉ hỗ trợ chế độ ngang</span>
-</div>
-</div>
-
 <script>
 
-/* ===== MATRIX LANDSCAPE CONTROL ===== */
+/* ===== MATRIX AUTO LANDSCAPE LOCK ===== */
 
-function checkMatrixOrientation(){
+async function lockMatrixLandscape(){
 
-let matrixScreen=document.getElementById("matrix")
-let notice=document.getElementById("rotateDeviceNotice")
+try{
 
-if(!matrixScreen.classList.contains("active")){
-notice.style.display="none"
-return
+if(screen.orientation && screen.orientation.lock){
+
+await screen.orientation.lock("landscape")
+
 }
 
-let isMobile=window.innerWidth<900
-
-if(!isMobile){
-notice.style.display="none"
-return
-}
-
-let portrait=window.innerHeight>window.innerWidth
-
-if(portrait){
-notice.style.display="flex"
-}else{
-notice.style.display="none"
+}catch(e){
+console.log("Orientation lock not supported")
 }
 
 }
 
-window.addEventListener("resize",checkMatrixOrientation)
-window.addEventListener("orientationchange",checkMatrixOrientation)
+function unlockMatrixOrientation(){
 
-/* hook khi chuyển màn hình */
+try{
 
-const originalGo=go
-go=function(screen){
+if(screen.orientation && screen.orientation.unlock){
 
-originalGo(screen)
+screen.orientation.unlock()
 
-setTimeout(checkMatrixOrientation,50)
+}
+
+}catch(e){
+console.log("Orientation unlock not supported")
+}
+
+}
+
+/* HOOK showMatrix */
+
+const originalShowMatrix = showMatrix
+
+showMatrix = function(){
+
+originalShowMatrix()
+
+setTimeout(lockMatrixLandscape,100)
+
+}
+
+/* HOOK go() để bỏ khóa khi rời matrix */
+
+const originalGoFunction = go
+
+go = function(screen){
+
+if(screen !== "matrix"){
+
+unlockMatrixOrientation()
+
+}
+
+originalGoFunction(screen)
 
 }
 
 </script>
-
 </body>
 </html>
