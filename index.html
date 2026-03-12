@@ -68,6 +68,13 @@ padding:6px 10px;
 font-size:16px;
 }
 
+.smallBtnBlue{
+background:#2563eb;
+color:white;
+padding:6px 10px;
+font-size:16px;
+}
+
 .grid{
 display:grid;
 gap:6px;
@@ -378,7 +385,7 @@ Số nút mỗi hàng
 <button class="smallBtn" onclick="go('setup')">← Cấu hình</button>
 <button class="smallBtn" onclick="resetBoards()">Reset</button>
 <button class="smallBtn" onclick="undo()">Xóa</button>
-<button onclick="showMatrix()">List</button>
+<button class="smallBtnBlue" onclick="showMatrix()">List</button>
 
 </div>
 
@@ -1081,7 +1088,7 @@ matrixContainer.innerHTML=html
 }
 
 /* EXCEL */
-
+/*
 function renderExcelMatrix(){
 
 let groups={}
@@ -1129,7 +1136,87 @@ html+="</table>"
 matrixContainer.innerHTML=html
 
 }
+*/
 
+function renderExcelMatrix(){
+
+let groups={}
+
+boards.forEach(b=>{
+if(!groups[b.l])groups[b.l]=[]
+groups[b.l].push(b.w)
+})
+
+let lengths=Object.keys(groups).sort((a,b)=>a-b)
+
+lengths.forEach(l=>groups[l].sort((a,b)=>a-b))
+
+let columns=[]
+
+lengths.forEach(l=>{
+let arr=groups[l]
+for(let i=0;i<arr.length;i+=10){
+columns.push({length:l,values:arr.slice(i,i+10)})
+}
+})
+
+let html="<table><tr>"
+
+/* CỘT MÔ TẢ */
+
+html+="<th style='font-family:Arial;font-weight:bold'>Dài</th>"
+
+columns.forEach(c=>{
+html+="<th>"+c.length+"</th>"
+})
+
+html+="</tr>"
+
+/* 10 HÀNG RỘNG */
+
+for(let r=0;r<10;r++){
+
+html+="<tr>"
+
+if(r==0){
+html+="<th rowspan='10' style='font-family:Arial;font-weight:bold'>Rộng</th>"
+}
+
+columns.forEach(c=>{
+html+="<td>"+(c.values[r]||"")+"</td>"
+})
+
+html+="</tr>"
+
+}
+
+/* HÀNG TỔNG */
+
+html+="<tr>"
+
+html+="<th style='font-family:Arial;font-weight:bold'>Tổng</th>"
+
+columns.forEach(c=>{
+
+let sumWidth=0
+
+c.values.forEach(w=>{
+if(w) sumWidth+=Number(w)
+})
+
+let total=c.length*sumWidth*thickness.value
+
+html+="<td style='font-size:60%;font-weight:bold'>"+(sumWidth?total:"")+"</td>"
+
+})
+
+html+="</tr>"
+
+html+="</table>"
+
+matrixContainer.innerHTML=html
+
+}
 /* CAPTURE + DOWNLOAD */
 
 async function downloadMatrixImage(){
