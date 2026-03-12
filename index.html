@@ -1298,72 +1298,84 @@ navigator.serviceWorker.register("service-worker.js")
 }
 
 </script>
+  
 <script>
 
-/* ===== MATRIX AUTO LANDSCAPE LOCK ===== */
+/* ===== MATRIX FORCE LANDSCAPE ===== */
 
-async function lockMatrixLandscape(){
+async function enterMatrixLandscape(){
 
 try{
+
+/* fullscreen */
+
+if(document.documentElement.requestFullscreen){
+await document.documentElement.requestFullscreen()
+}
+
+/* lock landscape */
 
 if(screen.orientation && screen.orientation.lock){
-
 await screen.orientation.lock("landscape")
-
 }
 
 }catch(e){
-console.log("Orientation lock not supported")
+console.log("Landscape lock not supported",e)
 }
 
 }
 
-function unlockMatrixOrientation(){
+async function exitMatrixLandscape(){
 
 try{
 
+/* unlock */
+
 if(screen.orientation && screen.orientation.unlock){
-
 screen.orientation.unlock()
-
 }
 
-}catch(e){
-console.log("Orientation unlock not supported")
+/* exit fullscreen */
+
+if(document.fullscreenElement){
+await document.exitFullscreen()
 }
+
+}catch(e){}
 
 }
 
 /* HOOK showMatrix */
 
-const originalShowMatrix = showMatrix
+const oldShowMatrix = showMatrix
 
 showMatrix = function(){
 
-originalShowMatrix()
+oldShowMatrix()
 
-setTimeout(lockMatrixLandscape,100)
+setTimeout(()=>{
+enterMatrixLandscape()
+},100)
 
 }
 
-/* HOOK go() để bỏ khóa khi rời matrix */
+/* HOOK go() */
 
-const originalGoFunction = go
+const oldGo = go
 
 go = function(screen){
 
 if(screen !== "matrix"){
-
-unlockMatrixOrientation()
-
+exitMatrixLandscape()
 }
 
-originalGoFunction(screen)
+oldGo(screen)
 
 }
 
 </script>
 </body>
 </html>
+
 
 
