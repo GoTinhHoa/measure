@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Đo Gỗ">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <title>Đo Gỗ V4</title>
+    <title>Đo Gỗ V2</title>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         * {
@@ -356,7 +356,7 @@
         </div>
         <div style="display:flex; justify-content:space-between; margin-top:10px;">
             <button onclick="startMeasure()">Bắt đầu nhập</button>
-            <button onclick="resetSetting()">Reset</button>
+            <button onclick="confirmResetSetting()">Reset</button>
         </div>
     </div>
     <!-- MEASURE -->
@@ -366,7 +366,7 @@
         </div>
         <div class="card">
             <button class="smallBtn" onclick="go('setup')">← Cấu hình</button>
-            <button class="smallBtn" onclick="resetBoards()">Reset</button>
+            <button class="smallBtn" onclick="confirmResetBoards()">Reset</button>
             <button class="smallBtn" onclick="undo()">Xóa</button>
             <button class="smallBtnBlue" onclick="showMatrix()">List →</button>
         </div>
@@ -571,6 +571,11 @@
             } catch (e) { }
         }
         /* RESET */
+        function confirmResetSetting() {
+            if (confirm("Bạn có chắc muốn reset cấu hình kiện?")) {
+                resetSetting()
+            }
+        }
         function resetSetting() {
             bundle.value = ""
             woodType.value = ""
@@ -782,6 +787,11 @@
             updateSummary()
             renderList()
             saveState()
+        }
+        function confirmResetBoards() {
+            if (confirm("Bạn có chắc muốn xóa toàn bộ tấm đã nhập?")) {
+                resetBoards()
+            }
         }
         function resetBoards() { boards = []; updateSummary(); renderList(); saveState() }
         function undo() { boards.pop(); updateSummary(); renderList(); saveState() }
