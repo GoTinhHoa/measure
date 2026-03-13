@@ -818,7 +818,19 @@
                 resetBoards()
             }
         }
-        function resetBoards() { boards = []; updateSummary(); renderList(); saveState() }
+        function resetBoards() {
+            boards = []
+            /* reset lượt về 1 */
+            currentTurn = 1
+            selectedLength = null
+            document.querySelectorAll("#lengthGrid button")
+                .forEach(x => x.classList.remove("selected"))
+            widthGrid.classList.add("disabled")
+            updateSummary()
+            renderList()
+            saveState()
+            showToast("Đã reset dữ liệu")
+        }
         function undo() { boards.pop(); updateSummary(); renderList(); saveState() }
         /* MATRIX */
         function showMatrix() {
