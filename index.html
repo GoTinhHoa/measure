@@ -746,25 +746,22 @@
             widths.forEach(v => {
                 let b = document.createElement("button")
                 b.innerText = v
+                /* gỗ Mỹ: số nguyên in đậm */
+                if (woodUS && Number.isInteger(v)) {
+                    b.classList.add("usWhole")
+                }
                 b.onclick = () => {
                     if (selectedLength == null) return
-
                     speakNumber(v)
-
                     boards.push({
                         l: selectedLength,
                         w: v,
                         turn: currentTurn
                     })
-
-                    /* reset chọn dài */
                     selectedLength = null
                     document.querySelectorAll("#lengthGrid button")
                         .forEach(x => x.classList.remove("selected"))
-
-                    /* disable panel rộng */
                     widthGrid.classList.add("disabled")
-
                     updateSummary()
                     renderList()
                     saveState()
