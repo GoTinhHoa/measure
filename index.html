@@ -9,11 +9,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Đo Gỗ">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <title>Đo Gỗ V2</title>
+    <title>Đo Gỗ V5</title>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
+        }
+
+        .usWhole {
+            font-weight: 700;
         }
 
         body {
@@ -717,6 +721,11 @@
             lengths.forEach(v => {
                 let b = document.createElement("button")
                 b.innerText = v
+
+                /* gỗ Mỹ: số nguyên in đậm */
+                if (woodUS && Number.isInteger(v)) {
+                    b.classList.add("usWhole")
+                }
                 b.onclick = () => {
                     speakNumber(v)
                     selectedLength = v
@@ -745,9 +754,12 @@
                         w: v,
                         turn: currentTurn
                     })
+                    /* reset chọn dài */
                     selectedLength = null
                     document.querySelectorAll("#lengthGrid button")
                         .forEach(x => x.classList.remove("selected"))
+
+                    /* disable lại panel rộng */
                     widthGrid.classList.add("disabled")
                     updateSummary()
                     renderList()
