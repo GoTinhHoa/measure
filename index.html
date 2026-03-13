@@ -348,8 +348,9 @@
             <button class="smallBtn" onclick="undo()">Xóa</button>
             <button class="smallBtnBlue" onclick="showMatrix()">List →</button>
         </div>
-        <div class="card">
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
             <b id="summary"></b>
+            <button class="smallBtn" onclick="newTurn()">Lượt mới</button>
         </div>
         <div class="card">
             <div class="panelHeader">
@@ -415,6 +416,16 @@
         </div>
     </div>
     <script>
+        /* TURN */
+        function newTurn() {
+            let lastTurnBoards = boards.filter(b => b.turn === currentTurn)
+            if (lastTurnBoards.length < 1) {
+                showToast("Lượt hiện tại chưa có tấm")
+                return
+            }
+            currentTurn++
+            showToast("Chuyển sang lượt " + currentTurn)
+        }
         /* TOAST */
         function showToast(msg) {
             let t = document.getElementById("toast")
@@ -484,6 +495,7 @@
         let boards = []
         let selectedLength = null
         let grid = 6
+        let currentTurn = 1
         let lenMin = 20
         let lenMax = 35
         let widMin = 15
@@ -493,6 +505,7 @@
         function saveState() {
             let state = {
                 boards: boards,
+                currentTurn: currentTurn,
                 grid: grid,
                 lenMin: lenMin,
                 lenMax: lenMax,
@@ -512,6 +525,15 @@
             try {
                 let state = JSON.parse(raw)
                 boards = state.boards || []
+                boards.forEach(b => {
+                    if (!b.turn) b.turn = 1
+                })
+
+                currentTurn = state.currentTurn || 1
+
+                if (boards.length > 0) {
+                    currentTurn = Math.max(...boards.map(b => b.turn))
+                }
                 grid = state.grid || 6
                 lenMin = state.lenMin || 20
                 lenMax = state.lenMax || 35
@@ -679,7 +701,11 @@
                 b.onclick = () => {
                     if (selectedLength == null) return
                     speakNumber(v)
-                    boards.push({ l: selectedLength, w: v })
+                    boards.push({
+                        l: selectedLength,
+                        w: v,
+                        turn: currentTurn
+                    })
                     selectedLength = null
                     document.querySelectorAll("#lengthGrid button")
                         .forEach(x => x.classList.remove("selected"))
@@ -702,15 +728,35 @@
         /* LIST */
         function renderList() {
             boardList.innerHTML = ""
-            boards.slice().reverse().forEach((b, i) => {
-                let d = document.createElement("div")
-                d.innerHTML = b.l + " x " + b.w +
-                    " <button onclick='deleteBoard(" + i + ")'>x</button>"
-                boardList.appendChild(d)
+            if (boards.length === 0) return
+            let groups = {}
+            boards.forEach(b => {
+                if (!groups[b.turn]) groups[b.turn] = []
+                groups[b.turn].push(b)
+            })
+            let turns = Object.keys(groups).sort((a, b) => b - a)
+            turns.forEach(turn => {
+                let arr = groups[turn]
+                let header = document.createElement("div")
+                header.style.fontWeight = "bold"
+                header.style.marginTop = "6px"
+                header.innerText = "Lượt " + turn + " : " + arr.length + " tấm"
+                boardList.appendChild(header)
+                arr.slice().reverse().forEach((b, i) => {
+                    let index = boards.indexOf(b)
+                    let row = document.createElement("div")
+                    row.style.display = "flex"
+                    row.style.justifyContent = "space-between"
+                    row.style.alignItems = "center"
+                    row.innerHTML =
+                        "<span>" + b.l + " x " + b.w + "</span>" +
+                        "<button onclick='deleteBoard(" + index + ")'>x</button>"
+                    boardList.appendChild(row)
+                })
             })
         }
         function deleteBoard(i) {
-            boards.splice(boards.length - 1 - i, 1)
+            boards.splice(i, 1)
             updateSummary()
             renderList()
             saveState()
@@ -886,4 +932,3 @@
 </body>
 
 </html>
-
