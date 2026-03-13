@@ -16,6 +16,12 @@
             box-sizing: border-box;
         }
 
+        #matrixDate {
+            font-size: 14px;
+            color: #475569;
+            font-weight: 500;
+        }
+
         .usWhole {
             font-weight: 700;
         }
@@ -444,7 +450,11 @@
         </div>
         <div id="matrixCaptureArea">
             <div class="card">
-                <div id="matrixHeader"></div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div id="matrixHeader"></div>
+                    <div id="matrixDate"></div>
+                </div>
+
                 <div class="matrixStats">
                     <span id="matrixPieces"></span>
                     <span id="matrixVolume"></span>
@@ -454,6 +464,19 @@
         </div>
     </div>
     <script>
+        function getDateTime() {
+
+            let now = new Date()
+
+            let d = String(now.getDate()).padStart(2, "0")
+            let m = String(now.getMonth() + 1).padStart(2, "0")
+            let y = now.getFullYear()
+
+            let h = String(now.getHours()).padStart(2, "0")
+            let min = String(now.getMinutes()).padStart(2, "0")
+
+            return d + "/" + m + "/" + y + "  " + h + ":" + min
+        }
         /* TURN */
         function newTurn() {
             let lastTurnBoards = boards.filter(b => b.turn === currentTurn)
@@ -835,6 +858,7 @@
         /* MATRIX */
         function showMatrix() {
             updateMatrixHeader()
+            document.getElementById("matrixDate").innerText = getDateTime()
             renderMatrix()
             go("matrix")
         }
