@@ -357,7 +357,7 @@
         <div class="card matrixToolbar">
             <button class="smallBtn" onclick="go('measure')">← Quay lại</button>
             <button class="smallBtn" onclick="downloadMatrixImage()">Tải ảnh</button>
-            <button class="smallBtn" onclick="shareMatrixZalo()">Chia sẻ Zalo</button>
+            <button class="smallBtnBlue" onclick="shareMatrixZalo()">Chia sẻ Zalo</button>
             <div class="checkboxRow">
                 <span>Dạng excel</span>
                 <input type="checkbox" id="excelMode" checked onchange="renderMatrix()">
@@ -849,5 +849,64 @@
                 .then(() => console.log("PWA ready"));
         }
     </script>
+
+<!-- MATRIX ORIENTATION PATCH -->
+<script>
+function isTouchDevice(){
+    return ('ontouchstart' in window) || navigator.maxTouchPoints > 0
+}
+
+async function lockLandscape(){
+    try{
+        if(screen.orientation && screen.orientation.lock){
+            await screen.orientation.lock("landscape")
+        }
+    }catch(e){}
+}
+
+function unlockOrientation(){
+    try{
+        if(screen.orientation && screen.orientation.unlock){
+            screen.orientation.unlock()
+        }
+    }catch(e){}
+}
+
+async function enterFullscreen(){
+    let el=document.documentElement
+    if(el.requestFullscreen){
+        await el.requestFullscreen()
+    }
+}
+
+async function exitFullscreen(){
+    if(document.fullscreenElement){
+        await document.exitFullscreen()
+    }
+}
+
+/* override showMatrix */
+const originalShowMatrix = showMatrix
+showMatrix = async function(){
+    originalShowMatrix()
+    if(isTouchDevice()){
+        try{
+            await enterFullscreen()
+            await lockLandscape()
+        }catch(e){}
+    }
+}
+
+/* override go */
+const originalGo = go
+go = function(screen){
+    originalGo(screen)
+    if(screen !== "matrix"){
+        unlockOrientation()
+        exitFullscreen()
+    }
+}
+</script>
+
 </body>
 </html>
