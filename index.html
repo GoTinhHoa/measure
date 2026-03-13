@@ -92,11 +92,23 @@
             background: white;
             color: black;
             border: 1px solid #e2e8f0;
-            font-size: 18px;
-            padding: 12px;
+
+            width: 100%;
+            aspect-ratio: 1;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: clamp(16px, 3vw, 22px);
+            padding: 0;
         }
 
-        .selected {
+        #measure .card {
+            padding: 8px;
+        }
+
+        F .selected {
             background: #22c55e !important;
             color: white !important;
         }
@@ -964,4 +976,3 @@
 </body>
 
 </html>
-
