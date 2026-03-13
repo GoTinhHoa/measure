@@ -1,1382 +1,853 @@
 <!DOCTYPE html>
 <html>
 <head>
-
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<link rel="manifest" href="manifest.json">
-
-<meta name="theme-color" content="#1e293b">
-
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="Đo Gỗ">
-<link rel="apple-touch-icon" href="icon-192.png">
-
-<title>Đo Gỗ V2</title>
-
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-
-<style>
-
-#rotateDeviceNotice{
-position:fixed;
-top:0;
-left:0;
-right:0;
-bottom:0;
-background:#0f172a;
-color:white;
-display:none;
-align-items:center;
-justify-content:center;
-text-align:center;
-z-index:99999;
-padding:30px;
-font-size:20px;
-font-weight:600;
-}
-
-#rotateDeviceNotice span{
-display:block;
-font-size:16px;
-opacity:0.8;
-margin-top:10px;
-}
-  
-*{
-box-sizing:border-box;
-}
-
-body{
-margin:0;
-font-family:-apple-system,BlinkMacSystemFont,Inter,Arial;
-background:#f5f7fa;
-}
-
-.noZoom{
-touch-action:manipulation;
-}
-
-.header{
-background:#1e293b;
-color:white;
-padding:14px;
-text-align:center;
-font-weight:600;
-}
-
-.screen{display:none;padding:12px}
-.active{display:block}
-
-.card{
-background:white;
-border-radius:14px;
-padding:12px;
-margin-bottom:10px;
-box-shadow:0 4px 12px rgba(0,0,0,0.08);
-}
-
-button{
-border:none;
-border-radius:10px;
-padding:12px;
-font-size:18px;
-background:#2563eb;
-color:white;
-}
-
-.smallBtn{
-background:#e2e8f0;
-color:black;
-padding:6px 10px;
-font-size:16px;
-}
-
-.smallBtnBlue{
-background:#2563eb;
-color:white;
-padding:6px 10px;
-font-size:16px;
-}
-
-.grid{
-display:grid;
-gap:6px;
-margin-top:6px;
-}
-
-.grid button{
-background:white;
-color:black;
-border:1px solid #e2e8f0;
-font-size:18px;
-padding:12px;
-}
-
-.selected{
-background:#22c55e!important;
-color:white!important;
-}
-
-.disabled{
-opacity:0.3;
-pointer-events:none;
-}
-
-.toast{
-position:fixed;
-top:20px;
-left:50%;
-transform:translateX(-50%);
-background:#dcfce7;
-color:#166534;
-padding:10px 18px;
-border-radius:10px;
-display:none;
-z-index:99999;
-}
-
-.list{
-max-height:220px;
-overflow:auto;
-}
-
-/* MATRIX FIX */
-
-.matrix{
-width:100%;
-overflow-x:auto;
-overflow-y:hidden;
-padding:0;
-}
-
-#matrixContainer{
-width:100%;
-display:block;
-overflow-x:auto;
-padding:0;
-}
-
-#matrixContainer.card{
-padding:0;
-}
-
-#matrix .card{
-height:auto;
-min-height:unset;
-}
-
-table{
-border-collapse:collapse;
-margin:0;
-}
-
-td,th{
-border:1px solid #ddd;
-width:42px;
-height:42px;
-text-align:center;
-font-size:12px;
-}
-
-th{background:#f1f5f9;}
-
-.formGrid{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:16px 20px;
-}
-
-input{
-width:100%;
-padding:8px;
-border-radius:8px;
-border:1px solid #ccc;
-font-size:16px;
-}
-
-.panelHeader{
-display:flex;
-align-items:center;
-justify-content:space-between;
-margin-bottom:4px;
-}
-
-.rangeGroup{
-display:flex;
-gap:20px;
-}
-
-.rangeControl{
-display:flex;
-align-items:center;
-gap:6px;
-}
-
-.matrixToolbar{
-display:flex;
-gap:10px;
-align-items:center;
-flex-wrap:wrap;
-}
-
-.checkboxRow{
-display:flex;
-align-items:center;
-gap:6px;
-white-space:nowrap;
-}
-
-.matrixStats{
-display:flex;
-gap:20px;
-font-weight:bold;
-margin-top:6px;
-}
-
-/* ACCESS */
-
-#accessScreen{
-position:fixed;
-top:0;
-left:0;
-right:0;
-bottom:0;
-background:linear-gradient(180deg,#1e293b,#0f172a);
-display:none;
-align-items:center;
-justify-content:center;
-z-index:9999;
-}
-
-.accessCard{
-background:white;
-padding:28px;
-border-radius:16px;
-width:300px;
-text-align:center;
-box-shadow:0 10px 30px rgba(0,0,0,0.25);
-}
-
-.accessTitle{
-font-size:20px;
-font-weight:600;
-margin-bottom:12px;
-}
-
-.accessDesc{
-font-size:14px;
-color:#555;
-margin-bottom:18px;
-}
-
-.accessInput{
-width:100%;
-padding:10px;
-font-size:16px;
-border-radius:10px;
-border:2px solid #e2e8f0;
-outline:none;
-text-align:center;
-}
-
-.accessInput:focus{
-border-color:#2563eb;
-}
-
-.accessBtn{
-margin-top:14px;
-width:100%;
-background:#2563eb;
-}
-
-.accessError{
-margin-top:10px;
-color:#dc2626;
-font-size:14px;
-min-height:18px;
-}
-
-.accessLoading{
-font-size:13px;
-color:#555;
-margin-top:6px;
-min-height:18px;
-}
-
-</style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Đo Gỗ">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Đo Gỗ V2</title>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+		* {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, Inter, Arial;
+            background: #f5f7fa;
+        }
+        .noZoom {
+            touch-action: manipulation;
+        }
+        .header {
+            background: #1e293b;
+            color: white;
+            padding: 14px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .screen {
+            display: none;
+            padding: 12px
+        }
+        .active {
+            display: block
+        }
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        button {
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 18px;
+            background: #2563eb;
+            color: white;
+        }
+        .smallBtn {
+            background: #e2e8f0;
+            color: black;
+            padding: 6px 10px;
+            font-size: 16px;
+        }
+        .smallBtnBlue {
+            background: #2563eb;
+            color: white;
+            padding: 6px 10px;
+            font-size: 16px;
+        }
+        .grid {
+            display: grid;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .grid button {
+            background: white;
+            color: black;
+            border: 1px solid #e2e8f0;
+            font-size: 18px;
+            padding: 12px;
+        }
+        .selected {
+            background: #22c55e !important;
+            color: white !important;
+        }
+        .disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #dcfce7;
+            color: #166534;
+            padding: 10px 18px;
+            border-radius: 10px;
+            display: none;
+            z-index: 99999;
+        }
+        .list {
+            max-height: 220px;
+            overflow: auto;
+        }
+        /* MATRIX FIX */
+        .matrix {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0;
+        }
+        #matrixContainer {
+            width: 100%;
+            display: block;
+            overflow-x: auto;
+            padding: 0;
+        }
+        #matrixContainer.card {
+            padding: 0;
+        }
+        #matrix .card {
+            height: auto;
+            min-height: unset;
+        }
+        table {
+            border-collapse: collapse;
+            margin: 0;
+        }
+        td,
+        th {
+            border: 1px solid #ddd;
+            width: 42px;
+            height: 42px;
+            text-align: center;
+            font-size: 12px;
+        }
+        th {
+            background: #f1f5f9;
+        }
+        .formGrid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px 20px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+        .panelHeader {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        .rangeGroup {
+            display: flex;
+            gap: 20px;
+        }
+        .rangeControl {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .matrixToolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .checkboxRow {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .matrixStats {
+            display: flex;
+            gap: 20px;
+            font-weight: bold;
+            margin-top: 6px;
+        }
+        /* ACCESS */
+        #accessScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, #1e293b, #0f172a);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .accessCard {
+            background: white;
+            padding: 28px;
+            border-radius: 16px;
+            width: 300px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        }
+        .accessTitle {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .accessDesc {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 18px;
+        }
+        .accessInput {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+            outline: none;
+            text-align: center;
+        }
+        .accessInput:focus {
+            border-color: #2563eb;
+        }
+        .accessBtn {
+            margin-top: 14px;
+            width: 100%;
+            background: #2563eb;
+        }
+        .accessError {
+            margin-top: 10px;
+            color: #dc2626;
+            font-size: 14px;
+            min-height: 18px;
+        }
+        .accessLoading {
+            font-size: 13px;
+            color: #555;
+            margin-top: 6px;
+            min-height: 18px;
+        }
+    </style>
 </head>
-
 <body>
-
-<div id="toast" class="toast"></div>
-
-<!-- ACCESS SCREEN -->
-
-<div id="accessScreen">
-
-<div class="accessCard">
-
-<div class="accessTitle">Truy cập ứng dụng</div>
-
-<div class="accessDesc">
-Nhập mã truy cập để sử dụng ứng dụng
-</div>
-
-<input id="accessInput" class="accessInput" placeholder="Nhập mã truy cập">
-
-<button id="accessBtn" class="accessBtn" onclick="checkAccessCode()">
-Xác nhận
-</button>
-
-<div id="accessLoading" class="accessLoading"></div>
-
-<div id="accessError" class="accessError"></div>
-
-</div>
-
-</div>
-
-<!-- SETUP -->
-
-<div id="setup" class="screen active noZoom">
-
-<div class="header">Cấu hình kiện</div>
-
-<div class="card">
-
-<div class="formGrid">
-
-<div>
-Mã kiện<br>
-<input id="bundle" oninput="this.value=this.value.toUpperCase()">
-</div>
-
-<div>
-Loại gỗ<br>
-<input id="woodType" oninput="this.value=this.value.toUpperCase()">
-</div>
-
-<div>
-Độ dày (cm)<br>
-<input id="thickness" type="number" step="any">
-</div>
-
-<div>
-Chất lượng<br>
-<input id="quality" oninput="this.value=this.value.toUpperCase()">
-</div>
-
-</div>
-
-<br>
-
-<div class="checkboxRow">
-<span>Gỗ Mỹ</span>
-<input type="checkbox" id="woodUS" onchange="toggleWoodUS()">
-</div>
-
-<br>
-
-Số nút mỗi hàng
-
-<br>
-
-<button class="smallBtn" onclick="gridMinus()">-</button>
-<span id="gridCount">6</span>
-<button class="smallBtn" onclick="gridPlus()">+</button>
-
-<br><br>
-
-<button class="smallBtn" onclick="resetSetting()">Reset</button>
-
-</div>
-
-<button onclick="startMeasure()">Bắt đầu nhập</button>
-
-</div>
-
-<!-- MEASURE -->
-
-<div id="measure" class="screen noZoom">
-
-<div class="header">
-<span id="headerInfo"></span>
-</div>
-
-<div class="card">
-
-<button class="smallBtn" onclick="go('setup')">← Cấu hình</button>
-<button class="smallBtn" onclick="resetBoards()">Reset</button>
-<button class="smallBtn" onclick="undo()">Xóa</button>
-<button class="smallBtnBlue" onclick="showMatrix()">List →</button>
-
-</div>
-
-<div class="card">
-<b id="summary"></b>
-</div>
-
-<div class="card">
-
-<div class="panelHeader">
-
-<b>Dài (dm)</b>
-
-<div class="rangeGroup">
-
-<div class="rangeControl">
-<button class="smallBtn" onclick="lenMin--; rebuild(); saveState()">-</button>
-<span id="lenMinLabel"></span>
-<button class="smallBtn" onclick="lenMin++; rebuild(); saveState()">+</button>
-</div>
-
-<div class="rangeControl">
-<button class="smallBtn" onclick="lenMax--; rebuild(); saveState()">-</button>
-<span id="lenMaxLabel"></span>
-<button class="smallBtn" onclick="lenMax++; rebuild(); saveState()">+</button>
-</div>
-
-</div>
-
-</div>
-
-<div id="lengthGrid" class="grid"></div>
-
-</div>
-
-<div class="card">
-
-<div class="panelHeader">
-
-<b>Rộng (cm)</b>
-
-<div class="rangeGroup">
-
-<div class="rangeControl">
-<button class="smallBtn" onclick="widMin--; rebuild(); saveState()">-</button>
-<span id="widMinLabel"></span>
-<button class="smallBtn" onclick="widMin++; rebuild(); saveState()">+</button>
-</div>
-
-<div class="rangeControl">
-<button class="smallBtn" onclick="widMax--; rebuild(); saveState()">-</button>
-<span id="widMaxLabel"></span>
-<button class="smallBtn" onclick="widMax++; rebuild(); saveState()">+</button>
-</div>
-
-</div>
-
-</div>
-
-<div id="widthGrid" class="grid disabled"></div>
-
-</div>
-
-<div class="card">
-
-<b>Danh sách tấm đã nhập</b>
-<div id="boardList" class="list"></div>
-
-</div>
-
-</div>
-
-<!-- MATRIX -->
-
-<div id="matrix" class="screen">
-
-<div class="header">List chi tiết</div>
-
-<div class="card matrixToolbar">
-
-<button class="smallBtn" onclick="go('measure')">← Quay lại</button>
-
-<button class="smallBtn" onclick="downloadMatrixImage()">Tải ảnh</button>
-
-<button class="smallBtn" onclick="shareMatrixZalo()">Chia sẻ Zalo</button>
-
-<div class="checkboxRow">
-<span>Dạng excel</span>
-<input type="checkbox" id="excelMode" checked onchange="renderMatrix()">
-</div>
-
-</div>
-
-<div id="matrixCaptureArea">
-
-<div class="card">
-
-<div id="matrixHeader"></div>
-
-<div class="matrixStats">
-<span id="matrixPieces"></span>
-<span id="matrixVolume"></span>
-</div>
-
-</div>
-
-<div class="matrix card" id="matrixContainer"></div>
-
-</div>
-
-</div>
-
-<script>
-
-/* TOAST */
-
-function showToast(msg){
-
-let t=document.getElementById("toast")
-t.innerText=msg
-t.style.display="block"
-
-setTimeout(()=>{
-t.style.display="none"
-},2000)
-
-}
-
-/* ACCESS */
-
-async function fetchAccessList(){
-
-try{
-
-let res=await fetch("device.json?ts="+Date.now())
-let data=await res.json()
-
-if(!data || !data.codes) return []
-
-return data.codes
-
-}catch(e){
-
-return []
-
-}
-
-}
-
-async function validateAccessCode(code){
-
-let codes=await fetchAccessList()
-return codes.includes(code)
-
-}
-
-async function checkAccessCode(){
-
-let input=document.getElementById("accessInput")
-let btn=document.getElementById("accessBtn")
-let error=document.getElementById("accessError")
-let loading=document.getElementById("accessLoading")
-
-let code=input.value.trim()
-
-if(!code){
-error.innerText="Vui lòng nhập mã truy cập"
-return
-}
-
-btn.disabled=true
-loading.innerText="Đang kiểm tra..."
-error.innerText=""
-
-let ok=await validateAccessCode(code)
-
-btn.disabled=false
-loading.innerText=""
-
-if(ok){
-
-localStorage.setItem("woodAccessCode",code)
-document.getElementById("accessScreen").style.display="none"
-
-}else{
-
-error.innerText="Mã không hợp lệ"
-
-if(navigator.vibrate){
-navigator.vibrate(200)
-}
-
-input.focus()
-
-}
-
-}
-
-async function verifySavedAccess(){
-
-let savedCode=localStorage.getItem("woodAccessCode")
-
-if(!savedCode){
-
-document.getElementById("accessScreen").style.display="flex"
-setTimeout(()=>accessInput.focus(),200)
-return
-
-}
-
-let ok=await validateAccessCode(savedCode)
-
-if(!ok){
-
-localStorage.removeItem("woodAccessCode")
-
-document.getElementById("accessScreen").style.display="flex"
-setTimeout(()=>accessInput.focus(),200)
-
-}
-
-}
-
-/* STATE */
-
-let boards=[]
-let selectedLength=null
-let grid=6
-
-let lenMin=20
-let lenMax=35
-let widMin=15
-let widMax=35
-
-let woodUS=false
-
-/* LOCAL STORAGE */
-
-function saveState(){
-
-let state={
-boards:boards,
-grid:grid,
-lenMin:lenMin,
-lenMax:lenMax,
-widMin:widMin,
-widMax:widMax,
-woodUS:woodUS,
-bundle:bundle.value,
-woodType:woodType.value,
-thickness:thickness.value,
-quality:quality.value
-}
-
-localStorage.setItem("woodMeasureState",JSON.stringify(state))
-
-}
-
-function loadState(){
-
-let raw=localStorage.getItem("woodMeasureState")
-if(!raw)return
-
-try{
-
-let state=JSON.parse(raw)
-
-boards=state.boards||[]
-grid=state.grid||6
-lenMin=state.lenMin||20
-lenMax=state.lenMax||35
-widMin=state.widMin||15
-widMax=state.widMax||35
-woodUS=state.woodUS||false
-
-bundle.value=state.bundle||""
-woodType.value=state.woodType||""
-thickness.value=state.thickness||""
-quality.value=state.quality||""
-
-document.getElementById("woodUS").checked=woodUS
-gridCount.innerText=grid
-
-}catch(e){}
-
-}
-
-/* RESET */
-
-function resetSetting(){
-
-bundle.value=""
-woodType.value=""
-quality.value=""
-thickness.value=""
-
-boards=[]
-
-document.getElementById("woodUS").checked=false
-woodUS=false
-
-updateSummary()
-renderList()
-saveState()
-
-}
-
-/* NAV */
-
-function go(screen){
-
-document.querySelectorAll(".screen").forEach(s=>{
-s.classList.remove("active")
-})
-
-document.getElementById(screen).classList.add("active")
-
-}
-
-/* SPEAK */
-
-function speakNumber(n){
-
-if(!window.speechSynthesis) return
-
-speechSynthesis.cancel()
-
-const digits=[
-"không","một","hai","ba","bốn",
-"năm","sáu","bảy","tám","chín"
-]
-
-function readInt(num){
-
-if(num<10) return digits[num]
-
-if(num==10) return "mười"
-
-if(num<20){
-return "mười "+digits[num%10]
-}
-
-let tens=Math.floor(num/10)
-let unit=num%10
-
-if(unit==0) return digits[tens]+" mươi"
-
-if(unit==1) return digits[tens]+" mốt"
-
-return digits[tens]+" "+digits[unit]
-
-}
-
-let text=""
-
-let s=n.toString()
-
-if(s.includes(".")){
-
-let parts=s.split(".")
-
-text = readInt(parseInt(parts[0])) + " phẩy " +
-parts[1].split("").map(d=>digits[d]).join(" ")
-
-}else{
-
-text = readInt(parseInt(s))
-
-}
-
-let utter=new SpeechSynthesisUtterance(text)
-utter.lang="vi-VN"
-utter.rate=1.3
-
-speechSynthesis.speak(utter)
-
-}
-
-/* GRID */
-
-function gridMinus(){if(grid>4)grid--;gridCount.innerText=grid;saveState()}
-function gridPlus(){if(grid<8)grid++;gridCount.innerText=grid;saveState()}
-
-/* WOOD US */
-
-function toggleWoodUS(){
-
-woodUS=document.getElementById("woodUS").checked
-
-if(woodUS){
-
-lenMin=22
-lenMax=25
-widMin=15
-widMax=25
-
-}else{
-
-lenMin=20
-lenMax=35
-widMin=15
-widMax=35
-
-}
-
-saveState()
-
-}
-
-/* START */
-
-function startMeasure(){
-
-if(bundle.value.trim()==""){
-alert("Vui lòng nhập mã kiện")
-bundle.focus()
-return
-}
-
-if(thickness.value.trim()==""){
-alert("Vui lòng nhập độ dày")
-thickness.focus()
-return
-}
-
-if(isNaN(thickness.value)){
-alert("Độ dày phải là số")
-thickness.focus()
-return
-}
-
-updateHeader()
-rebuild()
-
-go("measure")
-
-updateSummary()
-renderList()
-saveState()
-
-}
-
-/* HEADER */
-
-function updateHeader(){
-
-let info=[bundle.value,woodType.value,thickness.value+"cm",quality.value]
-.filter(v=>v!="")
-.join(" • ")
-
-headerInfo.innerText=info
-
-}
-
-/* BUILD GRID */
-
-function rebuild(){
-
-lenMinLabel.innerText=lenMin
-lenMaxLabel.innerText=lenMax
-widMinLabel.innerText=widMin
-widMaxLabel.innerText=widMax
-
-createButtons()
-
-saveState()
-
-}
-
-function createButtons(){
-
-lengthGrid.innerHTML=""
-widthGrid.innerHTML=""
-
-lengthGrid.style.gridTemplateColumns="repeat("+grid+",1fr)"
-widthGrid.style.gridTemplateColumns="repeat("+grid+",1fr)"
-
-let lengths=[]
-
-for(let i=lenMin;i<=lenMax;i++){
-
-lengths.push(i)
-
-if(woodUS){
-
-lengths.push(Number((i+0.3).toFixed(1)))
-lengths.push(Number((i+0.5).toFixed(1)))
-lengths.push(Number((i+0.7).toFixed(1)))
-
-}
-
-}
-
-lengths.forEach(v=>{
-
-let b=document.createElement("button")
-b.innerText=v
-
-b.onclick=()=>{
-
-speakNumber(v)
-
-selectedLength=v
-
-document.querySelectorAll("#lengthGrid button")
-.forEach(x=>x.classList.remove("selected"))
-
-b.classList.add("selected")
-
-widthGrid.classList.remove("disabled")
-
-}
-
-lengthGrid.appendChild(b)
-
-})
-
-let widths=[]
-
-for(let i=widMin;i<=widMax;i++){
-
-widths.push(i)
-
-if(woodUS){
-widths.push(Number((i+0.5).toFixed(1)))
-}
-
-}
-
-widths.forEach(v=>{
-
-let b=document.createElement("button")
-b.innerText=v
-
-b.onclick=()=>{
-
-if(selectedLength==null)return
-
-speakNumber(v)
-
-boards.push({l:selectedLength,w:v})
-
-selectedLength=null
-
-document.querySelectorAll("#lengthGrid button")
-.forEach(x=>x.classList.remove("selected"))
-
-widthGrid.classList.add("disabled")
-
-updateSummary()
-renderList()
-saveState()
-
-}
-
-widthGrid.appendChild(b)
-
-})
-
-}
-
-/* SUMMARY */
-
-function updateSummary(){
-
-let vol=0
-
-boards.forEach(b=>{
-vol+=(b.l/10)*(b.w/100)*(thickness.value/100)
-})
-
-summary.innerText=boards.length+" tấm • "+vol.toFixed(4)+" m³"
-
-}
-
-/* LIST */
-
-function renderList(){
-
-boardList.innerHTML=""
-
-boards.slice().reverse().forEach((b,i)=>{
-
-let d=document.createElement("div")
-
-d.innerHTML=b.l+" x "+b.w+
-" <button onclick='deleteBoard("+i+")'>x</button>"
-
-boardList.appendChild(d)
-
-})
-
-}
-
-function deleteBoard(i){
-
-boards.splice(boards.length-1-i,1)
-
-updateSummary()
-renderList()
-saveState()
-
-}
-
-function resetBoards(){boards=[];updateSummary();renderList();saveState()}
-function undo(){boards.pop();updateSummary();renderList();saveState()}
-
-/* MATRIX */
-
-function showMatrix(){
-
-updateMatrixHeader()
-renderMatrix()
-
-go("matrix")
-
-}
-
-function updateMatrixHeader(){
-
-let vol=0
-
-boards.forEach(b=>{
-vol+=(b.l/10)*(b.w/100)*(thickness.value/100)
-})
-
-let info=[bundle.value,woodType.value,thickness.value+"cm",quality.value]
-.filter(v=>v!="")
-.join(" • ")
-
-matrixHeader.innerText=info
-matrixPieces.innerText=boards.length+" tấm"
-matrixVolume.innerText=vol.toFixed(4)+" m³"
-
-}
-
-function autoScaleMatrix(){
-
-let container=document.getElementById("matrixContainer")
-let table=container.querySelector("table")
-
-if(!table)return
-
-let maxHeight=window.innerHeight*0.75
-
-let scale=Math.min(
-container.clientWidth/table.scrollWidth,
-maxHeight/table.scrollHeight
-)
-
-if(scale<1){
-table.style.transform="scale("+scale+")"
-table.style.transformOrigin="top left"
-}
-
-}
-
-function renderMatrix(){
-
-if(excelMode.checked) renderExcelMatrix()
-else renderHeatmap()
-
-setTimeout(autoScaleMatrix,50)
-
-}
-
-/* HEATMAP */
-
-function renderHeatmap(){
-
-let map={}
-
-boards.forEach(b=>{
-let key=b.w+"_"+b.l
-map[key]=(map[key]||0)+1
-})
-
-let widths=[...new Set(boards.map(b=>b.w))].sort((a,b)=>a-b)
-let lengths=[...new Set(boards.map(b=>b.l))].sort((a,b)=>a-b)
-
-let html="<table><tr><th>Rộng \\ Dài</th>"
-
-lengths.forEach(l=>html+="<th>"+l+"</th>")
-html+="</tr>"
-
-widths.forEach(w=>{
-html+="<tr><th>"+w+"</th>"
-lengths.forEach(l=>{
-let v=map[w+"_"+l]||0
-let color=v==0?"white":v==1?"#dcfce7":v==2?"#86efac":"#22c55e"
-html+="<td style='background:"+color+"'>"+v+"</td>"
-})
-html+="</tr>"
-})
-
-html+="</table>"
-
-matrixContainer.innerHTML=html
-
-}
-
-function renderExcelMatrix(){
-
-let groups={}
-
-boards.forEach(b=>{
-if(!groups[b.l])groups[b.l]=[]
-groups[b.l].push(b.w)
-})
-
-let lengths=Object.keys(groups).sort((a,b)=>a-b)
-
-lengths.forEach(l=>groups[l].sort((a,b)=>a-b))
-
-let columns=[]
-
-lengths.forEach(l=>{
-let arr=groups[l]
-for(let i=0;i<arr.length;i+=10){
-columns.push({length:l,values:arr.slice(i,i+10)})
-}
-})
-
-let html="<table><tr>"
-
-/* CỘT MÔ TẢ */
-
-html+="<th style='font-family:Arial;font-weight:bold'>Dài</th>"
-
-columns.forEach(c=>{
-html+="<th>"+c.length+"</th>"
-})
-
-html+="</tr>"
-
-/* 10 HÀNG RỘNG */
-
-for(let r=0;r<10;r++){
-
-html+="<tr>"
-
-if(r==0){
-html+="<th rowspan='10' style='font-family:Arial;font-weight:bold'>Rộng</th>"
-}
-
-columns.forEach(c=>{
-html+="<td>"+(c.values[r]||"")+"</td>"
-})
-
-html+="</tr>"
-
-}
-
-/* HÀNG TỔNG */
-
-html+="<tr>"
-
-html+="<th style='font-family:Arial;font-weight:bold'>Tổng</th>"
-
-columns.forEach(c=>{
-
-let sumWidth=0
-
-c.values.forEach(w=>{
-if(w) sumWidth+=Number(w)
-})
-
-let total=c.length*sumWidth*thickness.value
-
-html+="<th style='font-size:50%;font-weight:bold'>"+(sumWidth?total.toFixed(0):"")+"</th>"
-
-})
-
-html+="</tr>"
-
-html+="</table>"
-
-matrixContainer.innerHTML=html
-
-}
-/* CAPTURE + DOWNLOAD */
-
-async function downloadMatrixImage(){
-
-try{
-
-let el=document.getElementById("matrixCaptureArea")
-
-let table=el.querySelector("table")
-let oldTransform=table?table.style.transform:""
-
-if(table)table.style.transform="scale(1)"
-
-let canvas=await html2canvas(el,{scale:3})
-
-if(table)table.style.transform=oldTransform
-
-let link=document.createElement("a")
-link.download="matrix.png"
-link.href=canvas.toDataURL("image/png")
-link.click()
-
-showToast("Đã lưu ảnh")
-
-}catch(e){
-
-showToast("Lưu ảnh thất bại")
-
-}
-
-}
-
-/* SHARE */
-
-async function shareMatrixZalo(){
-
-try{
-
-let el=document.getElementById("matrixCaptureArea")
-
-let table=el.querySelector("table")
-let oldTransform=table?table.style.transform:""
-
-if(table)table.style.transform="scale(1)"
-
-let canvas=await html2canvas(el,{scale:3})
-
-if(table)table.style.transform=oldTransform
-
-canvas.toBlob(async function(blob){
-
-let file=new File([blob],"matrix.png",{type:"image/png"})
-
-if(navigator.share){
-
-await navigator.share({
-files:[file],
-title:"Matrix quy cách gỗ"
-})
-
-showToast("Chia sẻ thành công")
-
-}else{
-
-showToast("Thiết bị không hỗ trợ chia sẻ")
-
-}
-
-})
-
-}catch(e){
-
-showToast("Chia sẻ thất bại")
-
-}
-
-}
-
-/* LOAD */
-
-window.addEventListener("load",async function(){
-
-await verifySavedAccess()
-
-accessInput.addEventListener("keypress",function(e){
-if(e.key==="Enter"){
-checkAccessCode()
-}
-})
-
-loadState()
-rebuild()
-updateSummary()
-renderList()
-
-})
-
-</script>
-
-<script>
-
-if ("serviceWorker" in navigator) {
-navigator.serviceWorker.register("service-worker.js")
-.then(()=>console.log("PWA ready"));
-}
-
-</script>
-  
-<script>
-
-/* ===== MATRIX FORCE LANDSCAPE ===== */
-
-async function enterMatrixLandscape(){
-
-try{
-
-/* fullscreen */
-
-if(document.documentElement.requestFullscreen){
-await document.documentElement.requestFullscreen()
-}
-
-/* lock landscape */
-
-if(screen.orientation && screen.orientation.lock){
-await screen.orientation.lock("landscape")
-}
-
-}catch(e){
-console.log("Landscape lock not supported",e)
-}
-
-}
-
-async function exitMatrixLandscape(){
-
-try{
-
-/* unlock */
-
-if(screen.orientation && screen.orientation.unlock){
-screen.orientation.unlock()
-}
-
-/* exit fullscreen */
-
-if(document.fullscreenElement){
-await document.exitFullscreen()
-}
-
-}catch(e){}
-
-}
-
-/* HOOK showMatrix */
-
-const oldShowMatrix = showMatrix
-
-showMatrix = function(){
-
-oldShowMatrix()
-
-setTimeout(()=>{
-enterMatrixLandscape()
-},100)
-
-}
-
-/* HOOK go() */
-
-const oldGo = go
-
-go = function(screen){
-
-if(screen !== "matrix"){
-exitMatrixLandscape()
-}
-
-oldGo(screen)
-
-}
-
-</script>
+    <div id="toast" class="toast"></div>
+    <!-- ACCESS SCREEN -->
+    <div id="accessScreen">
+        <div class="accessCard">
+            <div class="accessTitle">Truy cập ứng dụng</div>
+            <div class="accessDesc">
+                Nhập mã truy cập để sử dụng ứng dụng
+            </div>
+            <input id="accessInput" class="accessInput" placeholder="Nhập mã truy cập">
+            <button id="accessBtn" class="accessBtn" onclick="checkAccessCode()">
+                Xác nhận
+            </button>
+            <div id="accessLoading" class="accessLoading"></div>
+            <div id="accessError" class="accessError"></div>
+        </div>
+    </div>
+    <!-- SETUP -->
+    <div id="setup" class="screen active noZoom">
+        <div class="header">Cấu hình kiện</div>
+        <div class="card">
+            <div class="formGrid">
+                <div>
+                    Mã kiện<br>
+                    <input id="bundle" oninput="this.value=this.value.toUpperCase()">
+                </div>
+                <div>
+                    Loại gỗ<br>
+                    <input id="woodType" oninput="this.value=this.value.toUpperCase()">
+                </div>
+                <div>
+                    Độ dày (cm)<br>
+                    <input id="thickness" type="number" step="any">
+                </div>
+                <div>
+                    Chất lượng<br>
+                    <input id="quality" oninput="this.value=this.value.toUpperCase()">
+                </div>
+            </div>
+            <br>
+            <div class="checkboxRow">
+                <span>Gỗ Mỹ</span>
+                <input type="checkbox" id="woodUS" onchange="toggleWoodUS()">
+            </div>
+            <br>
+            Số nút mỗi hàng
+            <br>
+            <button class="smallBtn" onclick="gridMinus()">-</button>
+            <span id="gridCount">6</span>
+            <button class="smallBtn" onclick="gridPlus()">+</button>
+            <br><br>
+            <button class="smallBtn" onclick="resetSetting()">Reset</button>
+        </div>
+        <button onclick="startMeasure()">Bắt đầu nhập</button>
+    </div>
+    <!-- MEASURE -->
+    <div id="measure" class="screen noZoom">
+        <div class="header">
+            <span id="headerInfo"></span>
+        </div>
+        <div class="card">
+            <button class="smallBtn" onclick="go('setup')">← Cấu hình</button>
+            <button class="smallBtn" onclick="resetBoards()">Reset</button>
+            <button class="smallBtn" onclick="undo()">Xóa</button>
+            <button class="smallBtnBlue" onclick="showMatrix()">List →</button>
+        </div>
+        <div class="card">
+            <b id="summary"></b>
+        </div>
+        <div class="card">
+            <div class="panelHeader">
+                <b>Dài (dm)</b>
+                <div class="rangeGroup">
+                    <div class="rangeControl">
+                        <button class="smallBtn" onclick="lenMin--; rebuild(); saveState()">-</button>
+                        <span id="lenMinLabel"></span>
+                        <button class="smallBtn" onclick="lenMin++; rebuild(); saveState()">+</button>
+                    </div>
+                    <div class="rangeControl">
+                        <button class="smallBtn" onclick="lenMax--; rebuild(); saveState()">-</button>
+                        <span id="lenMaxLabel"></span>
+                        <button class="smallBtn" onclick="lenMax++; rebuild(); saveState()">+</button>
+                    </div>
+                </div>
+            </div>
+            <div id="lengthGrid" class="grid"></div>
+        </div>
+        <div class="card">
+            <div class="panelHeader">
+                <b>Rộng (cm)</b>
+                <div class="rangeGroup">
+                    <div class="rangeControl">
+                        <button class="smallBtn" onclick="widMin--; rebuild(); saveState()">-</button>
+                        <span id="widMinLabel"></span>
+                        <button class="smallBtn" onclick="widMin++; rebuild(); saveState()">+</button>
+                    </div>
+                    <div class="rangeControl">
+                        <button class="smallBtn" onclick="widMax--; rebuild(); saveState()">-</button>
+                        <span id="widMaxLabel"></span>
+                        <button class="smallBtn" onclick="widMax++; rebuild(); saveState()">+</button>
+                    </div>
+                </div>
+            </div>
+            <div id="widthGrid" class="grid disabled"></div>
+        </div>
+        <div class="card">
+            <b>Danh sách tấm đã nhập</b>
+            <div id="boardList" class="list"></div>
+        </div>
+    </div>
+    <!-- MATRIX -->
+    <div id="matrix" class="screen">
+        <div class="header">List chi tiết</div>
+        <div class="card matrixToolbar">
+            <button class="smallBtn" onclick="go('measure')">← Quay lại</button>
+            <button class="smallBtn" onclick="downloadMatrixImage()">Tải ảnh</button>
+            <button class="smallBtn" onclick="shareMatrixZalo()">Chia sẻ Zalo</button>
+            <div class="checkboxRow">
+                <span>Dạng excel</span>
+                <input type="checkbox" id="excelMode" checked onchange="renderMatrix()">
+            </div>
+        </div>
+        <div id="matrixCaptureArea">
+            <div class="card">
+                <div id="matrixHeader"></div>
+                <div class="matrixStats">
+                    <span id="matrixPieces"></span>
+                    <span id="matrixVolume"></span>
+                </div>
+            </div>
+            <div class="matrix card" id="matrixContainer"></div>
+        </div>
+    </div>
+    <script>
+        /* TOAST */
+        function showToast(msg) {
+            let t = document.getElementById("toast")
+            t.innerText = msg
+            t.style.display = "block"
+            setTimeout(() => {
+                t.style.display = "none"
+            }, 2000)
+        }
+        /* ACCESS */
+        async function fetchAccessList() {
+            try {
+                let res = await fetch("device.json?ts=" + Date.now())
+                let data = await res.json()
+                if (!data || !data.codes) return []
+                return data.codes
+            } catch (e) {
+                return []
+            }
+        }
+        async function validateAccessCode(code) {
+            let codes = await fetchAccessList()
+            return codes.includes(code)
+        }
+        async function checkAccessCode() {
+            let input = document.getElementById("accessInput")
+            let btn = document.getElementById("accessBtn")
+            let error = document.getElementById("accessError")
+            let loading = document.getElementById("accessLoading")
+            let code = input.value.trim()
+            if (!code) {
+                error.innerText = "Vui lòng nhập mã truy cập"
+                return
+            }
+            btn.disabled = true
+            loading.innerText = "Đang kiểm tra..."
+            error.innerText = ""
+            let ok = await validateAccessCode(code)
+            btn.disabled = false
+            loading.innerText = ""
+            if (ok) {
+                localStorage.setItem("woodAccessCode", code)
+                document.getElementById("accessScreen").style.display = "none"
+            } else {
+                error.innerText = "Mã không hợp lệ"
+                if (navigator.vibrate) {
+                    navigator.vibrate(200)
+                }
+                input.focus()
+            }
+        }
+        async function verifySavedAccess() {
+            let savedCode = localStorage.getItem("woodAccessCode")
+            if (!savedCode) {
+                document.getElementById("accessScreen").style.display = "flex"
+                setTimeout(() => accessInput.focus(), 200)
+                return
+            }
+            let ok = await validateAccessCode(savedCode)
+            if (!ok) {
+                localStorage.removeItem("woodAccessCode")
+                document.getElementById("accessScreen").style.display = "flex"
+                setTimeout(() => accessInput.focus(), 200)
+            }
+        }
+        /* STATE */
+        let boards = []
+        let selectedLength = null
+        let grid = 6
+        let lenMin = 20
+        let lenMax = 35
+        let widMin = 15
+        let widMax = 35
+        let woodUS = false
+        /* LOCAL STORAGE */
+        function saveState() {
+            let state = {
+                boards: boards,
+                grid: grid,
+                lenMin: lenMin,
+                lenMax: lenMax,
+                widMin: widMin,
+                widMax: widMax,
+                woodUS: woodUS,
+                bundle: bundle.value,
+                woodType: woodType.value,
+                thickness: thickness.value,
+                quality: quality.value
+            }
+            localStorage.setItem("woodMeasureState", JSON.stringify(state))
+        }
+        function loadState() {
+            let raw = localStorage.getItem("woodMeasureState")
+            if (!raw) return
+            try {
+                let state = JSON.parse(raw)
+                boards = state.boards || []
+                grid = state.grid || 6
+                lenMin = state.lenMin || 20
+                lenMax = state.lenMax || 35
+                widMin = state.widMin || 15
+                widMax = state.widMax || 35
+                woodUS = state.woodUS || false
+                bundle.value = state.bundle || ""
+                woodType.value = state.woodType || ""
+                thickness.value = state.thickness || ""
+                quality.value = state.quality || ""
+                document.getElementById("woodUS").checked = woodUS
+                gridCount.innerText = grid
+            } catch (e) { }
+        }
+        /* RESET */
+        function resetSetting() {
+            bundle.value = ""
+            woodType.value = ""
+            quality.value = ""
+            thickness.value = ""
+            boards = []
+            document.getElementById("woodUS").checked = false
+            woodUS = false
+            updateSummary()
+            renderList()
+            saveState()
+        }
+        /* NAV */
+        function go(screen) {
+            document.querySelectorAll(".screen").forEach(s => {
+                s.classList.remove("active")
+            })
+            document.getElementById(screen).classList.add("active")
+        }
+        /* SPEAK */
+        function speakNumber(n) {
+            if (!window.speechSynthesis) return
+            speechSynthesis.cancel()
+            const digits = [
+                "không", "một", "hai", "ba", "bốn",
+                "năm", "sáu", "bảy", "tám", "chín"
+            ]
+            function readInt(num) {
+                if (num < 10) return digits[num]
+                if (num == 10) return "mười"
+                if (num < 20) {
+                    return "mười " + digits[num % 10]
+                }
+                let tens = Math.floor(num / 10)
+                let unit = num % 10
+                if (unit == 0) return digits[tens] + " mươi"
+                if (unit == 1) return digits[tens] + " mốt"
+                return digits[tens] + " " + digits[unit]
+            }
+            let text = ""
+            let s = n.toString()
+            if (s.includes(".")) {
+                let parts = s.split(".")
+                text = readInt(parseInt(parts[0])) + " phẩy " +
+                    parts[1].split("").map(d => digits[d]).join(" ")
+            } else {
+                text = readInt(parseInt(s))
+            }
+            let utter = new SpeechSynthesisUtterance(text)
+            utter.lang = "vi-VN"
+            utter.rate = 1.3
+            speechSynthesis.speak(utter)
+        }
+        /* GRID */
+        function gridMinus() { if (grid > 4) grid--; gridCount.innerText = grid; saveState() }
+        function gridPlus() { if (grid < 8) grid++; gridCount.innerText = grid; saveState() }
+        /* WOOD US */
+        function toggleWoodUS() {
+            woodUS = document.getElementById("woodUS").checked
+            if (woodUS) {
+                lenMin = 22
+                lenMax = 25
+                widMin = 15
+                widMax = 25
+            } else {
+                lenMin = 20
+                lenMax = 35
+                widMin = 15
+                widMax = 35
+            }
+            saveState()
+        }
+        /* START */
+        function startMeasure() {
+            if (bundle.value.trim() == "") {
+                alert("Vui lòng nhập mã kiện")
+                bundle.focus()
+                return
+            }
+            if (thickness.value.trim() == "") {
+                alert("Vui lòng nhập độ dày")
+                thickness.focus()
+                return
+            }
+            if (isNaN(thickness.value)) {
+                alert("Độ dày phải là số")
+                thickness.focus()
+                return
+            }
+            updateHeader()
+            rebuild()
+            go("measure")
+            updateSummary()
+            renderList()
+            saveState()
+        }
+        /* HEADER */
+        function updateHeader() {
+            let info = [bundle.value, woodType.value, thickness.value + "cm", quality.value]
+                .filter(v => v != "")
+                .join(" • ")
+            headerInfo.innerText = info
+        }
+        /* BUILD GRID */
+        function rebuild() {
+            lenMinLabel.innerText = lenMin
+            lenMaxLabel.innerText = lenMax
+            widMinLabel.innerText = widMin
+            widMaxLabel.innerText = widMax
+            createButtons()
+            saveState()
+        }
+        function createButtons() {
+            lengthGrid.innerHTML = ""
+            widthGrid.innerHTML = ""
+            lengthGrid.style.gridTemplateColumns = "repeat(" + grid + ",1fr)"
+            widthGrid.style.gridTemplateColumns = "repeat(" + grid + ",1fr)"
+            let lengths = []
+            for (let i = lenMin; i <= lenMax; i++) {
+                lengths.push(i)
+                if (woodUS) {
+                    lengths.push(Number((i + 0.3).toFixed(1)))
+                    lengths.push(Number((i + 0.5).toFixed(1)))
+                    lengths.push(Number((i + 0.7).toFixed(1)))
+                }
+            }
+            lengths.forEach(v => {
+                let b = document.createElement("button")
+                b.innerText = v
+                b.onclick = () => {
+                    speakNumber(v)
+                    selectedLength = v
+                    document.querySelectorAll("#lengthGrid button")
+                        .forEach(x => x.classList.remove("selected"))
+                    b.classList.add("selected")
+                    widthGrid.classList.remove("disabled")
+                }
+                lengthGrid.appendChild(b)
+            })
+            let widths = []
+            for (let i = widMin; i <= widMax; i++) {
+                widths.push(i)
+                if (woodUS) {
+                    widths.push(Number((i + 0.5).toFixed(1)))
+                }
+            }
+            widths.forEach(v => {
+                let b = document.createElement("button")
+                b.innerText = v
+                b.onclick = () => {
+                    if (selectedLength == null) return
+                    speakNumber(v)
+                    boards.push({ l: selectedLength, w: v })
+                    selectedLength = null
+                    document.querySelectorAll("#lengthGrid button")
+                        .forEach(x => x.classList.remove("selected"))
+                    widthGrid.classList.add("disabled")
+                    updateSummary()
+                    renderList()
+                    saveState()
+                }
+                widthGrid.appendChild(b)
+            })
+        }
+        /* SUMMARY */
+        function updateSummary() {
+            let vol = 0
+            boards.forEach(b => {
+                vol += (b.l / 10) * (b.w / 100) * (thickness.value / 100)
+            })
+            summary.innerText = boards.length + " tấm • " + vol.toFixed(4) + " m³"
+        }
+        /* LIST */
+        function renderList() {
+            boardList.innerHTML = ""
+            boards.slice().reverse().forEach((b, i) => {
+                let d = document.createElement("div")
+                d.innerHTML = b.l + " x " + b.w +
+                    " <button onclick='deleteBoard(" + i + ")'>x</button>"
+                boardList.appendChild(d)
+            })
+        }
+        function deleteBoard(i) {
+            boards.splice(boards.length - 1 - i, 1)
+            updateSummary()
+            renderList()
+            saveState()
+        }
+        function resetBoards() { boards = []; updateSummary(); renderList(); saveState() }
+        function undo() { boards.pop(); updateSummary(); renderList(); saveState() }
+        /* MATRIX */
+        function showMatrix() {
+            updateMatrixHeader()
+            renderMatrix()
+            go("matrix")
+        }
+        function updateMatrixHeader() {
+            let vol = 0
+            boards.forEach(b => {
+                vol += (b.l / 10) * (b.w / 100) * (thickness.value / 100)
+            })
+            let info = [bundle.value, woodType.value, thickness.value + "cm", quality.value]
+                .filter(v => v != "")
+                .join(" • ")
+            matrixHeader.innerText = info
+            matrixPieces.innerText = boards.length + " tấm"
+            matrixVolume.innerText = vol.toFixed(4) + " m³"
+        }
+        function autoScaleMatrix() {
+            let container = document.getElementById("matrixContainer")
+            let table = container.querySelector("table")
+            if (!table) return
+            let maxHeight = window.innerHeight * 0.75
+            let scale = Math.min(
+                container.clientWidth / table.scrollWidth,
+                maxHeight / table.scrollHeight
+            )
+            if (scale < 1) {
+                table.style.transform = "scale(" + scale + ")"
+                table.style.transformOrigin = "top left"
+            }
+        }
+        function renderMatrix() {
+            if (excelMode.checked) renderExcelMatrix()
+            else renderHeatmap()
+            setTimeout(autoScaleMatrix, 50)
+        }
+        /* HEATMAP */
+        function renderHeatmap() {
+            let map = {}
+            boards.forEach(b => {
+                let key = b.w + "_" + b.l
+                map[key] = (map[key] || 0) + 1
+            })
+            let widths = [...new Set(boards.map(b => b.w))].sort((a, b) => a - b)
+            let lengths = [...new Set(boards.map(b => b.l))].sort((a, b) => a - b)
+            let html = "<table><tr><th>Rộng \\ Dài</th>"
+            lengths.forEach(l => html += "<th>" + l + "</th>")
+            html += "</tr>"
+            widths.forEach(w => {
+                html += "<tr><th>" + w + "</th>"
+                lengths.forEach(l => {
+                    let v = map[w + "_" + l] || 0
+                    let color = v == 0 ? "white" : v == 1 ? "#dcfce7" : v == 2 ? "#86efac" : "#22c55e"
+                    html += "<td style='background:" + color + "'>" + v + "</td>"
+                })
+                html += "</tr>"
+            })
+            html += "</table>"
+            matrixContainer.innerHTML = html
+        }
+        function renderExcelMatrix() {
+            let groups = {}
+            boards.forEach(b => {
+                if (!groups[b.l]) groups[b.l] = []
+                groups[b.l].push(b.w)
+            })
+            let lengths = Object.keys(groups).sort((a, b) => a - b)
+            lengths.forEach(l => groups[l].sort((a, b) => a - b))
+            let columns = []
+            lengths.forEach(l => {
+                let arr = groups[l]
+                for (let i = 0; i < arr.length; i += 10) {
+                    columns.push({ length: l, values: arr.slice(i, i + 10) })
+                }
+            })
+            let html = "<table><tr>"
+            /* CỘT MÔ TẢ */
+            html += "<th style='font-family:Arial;font-weight:bold'>Dài</th>"
+            columns.forEach(c => {
+                html += "<th>" + c.length + "</th>"
+            })
+            html += "</tr>"
+            /* 10 HÀNG RỘNG */
+            for (let r = 0; r < 10; r++) {
+                html += "<tr>"
+                if (r == 0) {
+                    html += "<th rowspan='10' style='font-family:Arial;font-weight:bold'>Rộng</th>"
+                }
+                columns.forEach(c => {
+                    html += "<td>" + (c.values[r] || "") + "</td>"
+                })
+                html += "</tr>"
+            }
+            /* HÀNG TỔNG */
+            html += "<tr>"
+            html += "<th style='font-family:Arial;font-weight:bold'>Tổng</th>"
+            columns.forEach(c => {
+                let sumWidth = 0
+                c.values.forEach(w => {
+                    if (w) sumWidth += Number(w)
+                })
+                let total = c.length * sumWidth * thickness.value
+                html += "<th style='font-size:50%;font-weight:bold'>" + (sumWidth ? total.toFixed(0) : "") + "</th>"
+            })
+            html += "</tr>"
+            html += "</table>"
+            matrixContainer.innerHTML = html
+        }
+        /* CAPTURE + DOWNLOAD */
+        async function downloadMatrixImage() {
+            try {
+                let el = document.getElementById("matrixCaptureArea")
+                let table = el.querySelector("table")
+                let oldTransform = table ? table.style.transform : ""
+                if (table) table.style.transform = "scale(1)"
+                let canvas = await html2canvas(el, { scale: 3 })
+                if (table) table.style.transform = oldTransform
+                let link = document.createElement("a")
+                link.download = "matrix.png"
+                link.href = canvas.toDataURL("image/png")
+                link.click()
+                showToast("Đã lưu ảnh")
+            } catch (e) {
+                showToast("Lưu ảnh thất bại")
+            }
+        }
+        /* SHARE */
+        async function shareMatrixZalo() {
+            try {
+                let el = document.getElementById("matrixCaptureArea")
+                let table = el.querySelector("table")
+                let oldTransform = table ? table.style.transform : ""
+                if (table) table.style.transform = "scale(1)"
+                let canvas = await html2canvas(el, { scale: 3 })
+                if (table) table.style.transform = oldTransform
+                canvas.toBlob(async function (blob) {
+                    let file = new File([blob], "matrix.png", { type: "image/png" })
+                    if (navigator.share) {
+                        await navigator.share({
+                            files: [file],
+                            title: "Matrix quy cách gỗ"
+                        })
+                        showToast("Chia sẻ thành công")
+                    } else {
+                        showToast("Thiết bị không hỗ trợ chia sẻ")
+                    }
+                })
+            } catch (e) {
+                showToast("Chia sẻ thất bại")
+            }
+        }
+        /* LOAD */
+        window.addEventListener("load", async function () {
+            await verifySavedAccess()
+            accessInput.addEventListener("keypress", function (e) {
+                if (e.key === "Enter") {
+                    checkAccessCode()
+                }
+            })
+            loadState()
+            rebuild()
+            updateSummary()
+            renderList()
+        })
+    </script>
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("service-worker.js")
+                .then(() => console.log("PWA ready"));
+        }
+    </script>
 </body>
 </html>
-
-
-
-
