@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Đo Gỗ">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <title>Đo Gỗ V3</title>
+    <title>Đo Gỗ V4</title>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         * {
@@ -20,6 +20,14 @@
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, Inter, Arial;
             background: #f5f7fa;
+
+            overflow-x: hidden;
+        }
+
+        html,
+        body {
+            max-width: 100%;
+            overflow-x: hidden;
         }
 
         .noZoom {
@@ -27,7 +35,7 @@
         }
 
         .header {
-            background: #1e293b;
+            background: #2a2a2c;
             color: white;
             padding: 14px;
             text-align: center;
@@ -166,13 +174,16 @@
 
         input {
             width: 100%;
-            padding: 8px;
+            padding: 10px 12px;
             border-radius: 8px;
             border: 1px solid #ccc;
             font-size: 16px;
 
             box-sizing: border-box;
-            text-align: left;
+        }
+
+        .formGrid>div {
+            min-width: 0;
         }
 
         input:focus {
@@ -943,5 +954,3 @@
 </body>
 
 </html>
-
-
