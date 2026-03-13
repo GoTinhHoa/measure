@@ -7,9 +7,9 @@
     <meta name="theme-color" content="#1e293b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="Đo Gỗ">
+    <meta name="apple-mobile-web-app-title" content="Đo Gỗ v3">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <title>Đo Gỗ V2</title>
+    <title>Đo Gỗ V3</title>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         * {
@@ -30,8 +30,6 @@
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, Inter, Arial;
             background: #f5f7fa;
-
-            overflow-x: hidden;
         }
 
         html,
@@ -157,17 +155,10 @@
         #matrixContainer {
             width: 100%;
             display: block;
-            overflow-x: auto;
-            padding: 0;
         }
 
         #matrixContainer.card {
             padding: 0;
-        }
-
-        #matrix .card {
-            height: auto;
-            min-height: unset;
         }
 
         table {
@@ -200,8 +191,6 @@
             border-radius: 8px;
             border: 1px solid #ccc;
             font-size: 16px;
-
-            box-sizing: border-box;
         }
 
         .formGrid>div {
@@ -817,7 +806,7 @@
                 header.style.marginTop = "6px"
                 header.innerText = "Lượt " + turn + " : " + arr.length + " tấm"
                 boardList.appendChild(header)
-                arr.slice().reverse().forEach((b, i) => {
+                arr.slice().reverse().forEach((b) => {
                     let index = boards.indexOf(b)
                     let row = document.createElement("div")
                     row.style.display = "flex"
