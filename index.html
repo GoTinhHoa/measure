@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="manifest" href="manifest.json">
@@ -11,17 +12,20 @@
     <title>Đo Gỗ V2</title>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
-		* {
+        * {
             box-sizing: border-box;
         }
+
         body {
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, Inter, Arial;
             background: #f5f7fa;
         }
+
         .noZoom {
             touch-action: manipulation;
         }
+
         .header {
             background: #1e293b;
             color: white;
@@ -29,13 +33,16 @@
             text-align: center;
             font-weight: 600;
         }
+
         .screen {
             display: none;
             padding: 12px
         }
+
         .active {
             display: block
         }
+
         .card {
             background: white;
             border-radius: 14px;
@@ -43,6 +50,7 @@
             margin-bottom: 10px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
+
         button {
             border: none;
             border-radius: 10px;
@@ -51,23 +59,27 @@
             background: #2563eb;
             color: white;
         }
+
         .smallBtn {
             background: #e2e8f0;
             color: black;
             padding: 6px 10px;
             font-size: 16px;
         }
+
         .smallBtnBlue {
             background: #2563eb;
             color: white;
             padding: 6px 10px;
             font-size: 16px;
         }
+
         .grid {
             display: grid;
             gap: 6px;
             margin-top: 6px;
         }
+
         .grid button {
             background: white;
             color: black;
@@ -75,14 +87,17 @@
             font-size: 18px;
             padding: 12px;
         }
+
         .selected {
             background: #22c55e !important;
             color: white !important;
         }
+
         .disabled {
             opacity: 0.3;
             pointer-events: none;
         }
+
         .toast {
             position: fixed;
             top: 20px;
@@ -95,10 +110,12 @@
             display: none;
             z-index: 99999;
         }
+
         .list {
             max-height: 220px;
             overflow: auto;
         }
+
         /* MATRIX FIX */
         .matrix {
             width: 100%;
@@ -106,23 +123,28 @@
             overflow-y: hidden;
             padding: 0;
         }
+
         #matrixContainer {
             width: 100%;
             display: block;
             overflow-x: auto;
             padding: 0;
         }
+
         #matrixContainer.card {
             padding: 0;
         }
+
         #matrix .card {
             height: auto;
             min-height: unset;
         }
+
         table {
             border-collapse: collapse;
             margin: 0;
         }
+
         td,
         th {
             border: 1px solid #ddd;
@@ -131,14 +153,17 @@
             text-align: center;
             font-size: 12px;
         }
+
         th {
             background: #f1f5f9;
         }
+
         .formGrid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 16px 20px;
         }
+
         input {
             width: 100%;
             padding: 8px;
@@ -146,39 +171,46 @@
             border: 1px solid #ccc;
             font-size: 16px;
         }
+
         .panelHeader {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 4px;
         }
+
         .rangeGroup {
             display: flex;
             gap: 20px;
         }
+
         .rangeControl {
             display: flex;
             align-items: center;
             gap: 6px;
         }
+
         .matrixToolbar {
             display: flex;
             gap: 10px;
             align-items: center;
             flex-wrap: wrap;
         }
+
         .checkboxRow {
             display: flex;
             align-items: center;
             gap: 6px;
             white-space: nowrap;
         }
+
         .matrixStats {
             display: flex;
             gap: 20px;
             font-weight: bold;
             margin-top: 6px;
         }
+
         /* ACCESS */
         #accessScreen {
             position: fixed;
@@ -192,6 +224,7 @@
             justify-content: center;
             z-index: 9999;
         }
+
         .accessCard {
             background: white;
             padding: 28px;
@@ -200,16 +233,19 @@
             text-align: center;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
         }
+
         .accessTitle {
             font-size: 20px;
             font-weight: 600;
             margin-bottom: 12px;
         }
+
         .accessDesc {
             font-size: 14px;
             color: #555;
             margin-bottom: 18px;
         }
+
         .accessInput {
             width: 100%;
             padding: 10px;
@@ -219,20 +255,24 @@
             outline: none;
             text-align: center;
         }
+
         .accessInput:focus {
             border-color: #2563eb;
         }
+
         .accessBtn {
             margin-top: 14px;
             width: 100%;
             background: #2563eb;
         }
+
         .accessError {
             margin-top: 10px;
             color: #dc2626;
             font-size: 14px;
             min-height: 18px;
         }
+
         .accessLoading {
             font-size: 13px;
             color: #555;
@@ -241,6 +281,7 @@
         }
     </style>
 </head>
+
 <body>
     <div id="toast" class="toast"></div>
     <!-- ACCESS SCREEN -->
@@ -356,8 +397,7 @@
         <div class="header">List chi tiết</div>
         <div class="card matrixToolbar">
             <button class="smallBtn" onclick="go('measure')">← Quay lại</button>
-            <button class="smallBtn" onclick="downloadMatrixImage()">Tải ảnh</button>
-            <button class="smallBtnBlue" onclick="shareMatrixZalo()">Chia sẻ Zalo</button>
+            <button class="smallBtn" onclick="shareMatrixZalo()">Chia sẻ Zalo</button>
             <div class="checkboxRow">
                 <span>Dạng excel</span>
                 <input type="checkbox" id="excelMode" checked onchange="renderMatrix()">
@@ -786,32 +826,26 @@
             html += "</table>"
             matrixContainer.innerHTML = html
         }
-        /* CAPTURE + DOWNLOAD */
-        async function downloadMatrixImage() {
-            try {
-                let el = document.getElementById("matrixCaptureArea")
-                let table = el.querySelector("table")
-                let oldTransform = table ? table.style.transform : ""
-                if (table) table.style.transform = "scale(1)"
-                let canvas = await html2canvas(el, { scale: 3 })
-                if (table) table.style.transform = oldTransform
-                let link = document.createElement("a")
-                link.download = "matrix.png"
-                link.href = canvas.toDataURL("image/png")
-                link.click()
-                showToast("Đã lưu ảnh")
-            } catch (e) {
-                showToast("Lưu ảnh thất bại")
-            }
-        }
         /* SHARE */
         async function shareMatrixZalo() {
             try {
                 let el = document.getElementById("matrixCaptureArea")
                 let table = el.querySelector("table")
+                let oldWidth = el.style.width
                 let oldTransform = table ? table.style.transform : ""
-                if (table) table.style.transform = "scale(1)"
-                let canvas = await html2canvas(el, { scale: 3 })
+                if (table) {
+                    table.style.transform = "scale(1)"
+                    el.style.width = table.scrollWidth + "px"
+                }
+                let canvas = await html2canvas(el, {
+                    scale: 3,
+                    scrollX: 0,
+                    scrollY: 0,
+                    windowWidth: el.scrollWidth,
+                    windowHeight: el.scrollHeight
+                })
+
+                el.style.width = oldWidth
                 if (table) table.style.transform = oldTransform
                 canvas.toBlob(async function (blob) {
                     let file = new File([blob], "matrix.png", { type: "image/png" })
@@ -849,64 +883,6 @@
                 .then(() => console.log("PWA ready"));
         }
     </script>
-
-<!-- MATRIX ORIENTATION PATCH -->
-<script>
-function isTouchDevice(){
-    return ('ontouchstart' in window) || navigator.maxTouchPoints > 0
-}
-
-async function lockLandscape(){
-    try{
-        if(screen.orientation && screen.orientation.lock){
-            await screen.orientation.lock("landscape")
-        }
-    }catch(e){}
-}
-
-function unlockOrientation(){
-    try{
-        if(screen.orientation && screen.orientation.unlock){
-            screen.orientation.unlock()
-        }
-    }catch(e){}
-}
-
-async function enterFullscreen(){
-    let el=document.documentElement
-    if(el.requestFullscreen){
-        await el.requestFullscreen()
-    }
-}
-
-async function exitFullscreen(){
-    if(document.fullscreenElement){
-        await document.exitFullscreen()
-    }
-}
-
-/* override showMatrix */
-const originalShowMatrix = showMatrix
-showMatrix = async function(){
-    originalShowMatrix()
-    if(isTouchDevice()){
-        try{
-            await enterFullscreen()
-            await lockLandscape()
-        }catch(e){}
-    }
-}
-
-/* override go */
-const originalGo = go
-go = function(screen){
-    originalGo(screen)
-    if(screen !== "matrix"){
-        unlockOrientation()
-        exitFullscreen()
-    }
-}
-</script>
-
 </body>
+
 </html>
