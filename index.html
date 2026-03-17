@@ -4,7 +4,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1e293b">
+    <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Đo Gỗ v4">
@@ -16,88 +16,111 @@
 
 <body>
     <div id="toast" class="toast"></div>
+
+    <!-- CONFIRM MODAL -->
+    <div id="confirmModal" class="modalOverlay">
+        <div class="modalCard">
+            <div class="modalBody">
+                <div class="modalIcon">⚠️</div>
+                <div class="modalTitle" id="modalTitle"></div>
+                <div class="modalDesc" id="modalDesc"></div>
+            </div>
+            <div class="modalActions">
+                <button class="btnCancel" onclick="closeConfirm()">Hủy</button>
+                <button class="btnDanger" id="modalConfirmBtn">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ACCESS SCREEN -->
     <div id="accessScreen">
+        <div class="accessWrap">
+        <div class="brandName">Gỗ Tinh Hoa</div>
+        <div class="brandSub">Ứng dụng đo quy cách</div>
         <div class="accessCard">
             <div class="accessTitle">Truy cập ứng dụng</div>
-            <div class="accessDesc">
-                Nhập mã truy cập để sử dụng ứng dụng
-            </div>
+            <div class="accessDesc">Nhập mã truy cập để sử dụng ứng dụng</div>
             <input id="accessInput" class="accessInput" placeholder="Nhập mã truy cập">
-            <button id="accessBtn" class="accessBtn" onclick="checkAccessCode()">
-                Xác nhận
-            </button>
+            <button id="accessBtn" class="accessBtn" onclick="checkAccessCode()">Xác nhận</button>
             <div id="accessLoading" class="accessLoading"></div>
             <div id="accessError" class="accessError"></div>
         </div>
+        </div>
     </div>
+
     <!-- SETUP -->
     <div id="setup" class="screen active noZoom">
-        <div class="header">Cấu hình kiện</div>
+        <div class="header">
+            <img src="logo-192.png" class="headerLogo">
+            <span>Cấu hình kiện</span>
+        </div>
         <div class="card">
             <div class="formGrid">
                 <div>
-                    Mã kiện<br>
+                    <label class="fieldLabel">Mã kiện</label>
                     <input id="bundle" oninput="this.value=this.value.toUpperCase()">
                 </div>
                 <div>
-                    Loại gỗ<br>
+                    <label class="fieldLabel">Loại gỗ</label>
                     <input id="woodType" oninput="this.value=this.value.toUpperCase()">
                 </div>
                 <div>
-                    Độ dày (cm)<br>
+                    <label class="fieldLabel">Độ dày (cm)</label>
                     <input id="thickness" type="number" step="any">
                 </div>
                 <div>
-                    Chất lượng<br>
+                    <label class="fieldLabel">Chất lượng</label>
                     <input id="quality" oninput="this.value=this.value.toUpperCase()">
                 </div>
             </div>
-            <br>
-            <div class="checkboxRow">
-                <span>Gỗ Mỹ</span>
-                <input type="checkbox" id="woodUS" onchange="toggleWoodUS()">
+            <div class="toggleRow" style="margin-top:16px">
+                <label class="toggle">
+                    <input type="checkbox" id="woodUS" onchange="toggleWoodUS()">
+                    <span class="toggleSlider"></span>
+                </label>
+                <span class="toggleLabel">Gỗ Mỹ</span>
             </div>
-            <br>
-            Số nút mỗi hàng
-            <br>
-            <button class="smallBtn" onclick="gridMinus()">-</button>
-            <span id="gridCount">6</span>
-            <button class="smallBtn" onclick="gridPlus()">+</button>
-            <br>
-
+            <div class="gridCountRow">
+                <span class="gridCountLabel">Số nút / hàng</span>
+                <button class="smallBtn" onclick="gridMinus()">−</button>
+                <span class="gridCountVal" id="gridCount">6</span>
+                <button class="smallBtn" onclick="gridPlus()">+</button>
+            </div>
         </div>
-        <div style="display:flex; justify-content:space-between; margin-top:10px;">
+        <div style="display:flex; justify-content:space-between; margin-top:4px;">
             <button onclick="startMeasure()">Bắt đầu nhập</button>
             <button class="smallBtn" onclick="confirmResetSetting()">Reset</button>
         </div>
     </div>
+
     <!-- MEASURE -->
     <div id="measure" class="screen noZoom">
         <div class="header">
+            <img src="logo-192.png" class="headerLogo">
             <span id="headerInfo"></span>
         </div>
         <div class="card">
             <button class="smallBtn" onclick="go('setup')">← Cấu hình</button>
             <button class="smallBtn" onclick="confirmResetBoards()">Reset</button>
-            <button class="smallBtn" onclick="undo()">Xóa</button>
             <button class="smallBtnBlue" onclick="showMatrix()">List →</button>
         </div>
-        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
-            <b id="summary"></b>
-            <button class="smallBtn" onclick="newTurn()">Lượt mới</button>
+        <div class="card">
+            <div class="summaryBar">
+                <span class="summaryText" id="summary"></span>
+                <button class="smallBtn" onclick="newTurn()">Lượt mới</button>
+            </div>
         </div>
         <div class="card">
             <div class="panelHeader">
                 <b>Dài (dm)</b>
                 <div class="rangeGroup">
                     <div class="rangeControl">
-                        <button class="smallBtn" onclick="lenMin--; rebuild(); saveState()">-</button>
+                        <button class="smallBtn" onclick="lenMin--; rebuild(); saveState()">−</button>
                         <span id="lenMinLabel"></span>
                         <button class="smallBtn" onclick="lenMin++; rebuild(); saveState()">+</button>
                     </div>
                     <div class="rangeControl">
-                        <button class="smallBtn" onclick="lenMax--; rebuild(); saveState()">-</button>
+                        <button class="smallBtn" onclick="lenMax--; rebuild(); saveState()">−</button>
                         <span id="lenMaxLabel"></span>
                         <button class="smallBtn" onclick="lenMax++; rebuild(); saveState()">+</button>
                     </div>
@@ -110,12 +133,12 @@
                 <b>Rộng (cm)</b>
                 <div class="rangeGroup">
                     <div class="rangeControl">
-                        <button class="smallBtn" onclick="widMin--; rebuild(); saveState()">-</button>
+                        <button class="smallBtn" onclick="widMin--; rebuild(); saveState()">−</button>
                         <span id="widMinLabel"></span>
                         <button class="smallBtn" onclick="widMin++; rebuild(); saveState()">+</button>
                     </div>
                     <div class="rangeControl">
-                        <button class="smallBtn" onclick="widMax--; rebuild(); saveState()">-</button>
+                        <button class="smallBtn" onclick="widMax--; rebuild(); saveState()">−</button>
                         <span id="widMaxLabel"></span>
                         <button class="smallBtn" onclick="widMax++; rebuild(); saveState()">+</button>
                     </div>
@@ -124,20 +147,20 @@
             <div id="widthGrid" class="grid disabled"></div>
         </div>
         <div class="card">
-            <b>Danh sách tấm đã nhập</b>
+            <b style="font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Danh sách tấm</b>
             <div id="boardList" class="list"></div>
         </div>
     </div>
+
     <!-- MATRIX -->
     <div id="matrix" class="screen">
-        <div class="header">List chi tiết</div>
+        <div class="header">
+            <img src="logo-192.png" class="headerLogo">
+            <span>List chi tiết</span>
+        </div>
         <div class="card matrixToolbar">
             <button class="smallBtn" onclick="go('measure')">← Quay lại</button>
             <button class="smallBtnBlue" onclick="shareMatrixZalo()">Chia sẻ Zalo</button>
-            <div class="checkboxRow">
-                <span>Dạng excel</span>
-                <input type="checkbox" id="excelMode" checked onchange="renderMatrix()">
-            </div>
         </div>
         <div id="matrixCaptureArea">
             <div class="card">
@@ -145,7 +168,6 @@
                     <div id="matrixHeader"></div>
                     <div id="matrixDate"></div>
                 </div>
-
                 <div class="matrixStats">
                     <span id="matrixPieces"></span>
                     <span id="matrixVolume"></span>
@@ -154,6 +176,7 @@
             <div class="matrix card" id="matrixContainer"></div>
         </div>
     </div>
+
     <script src="app.js"></script>
 </body>
 

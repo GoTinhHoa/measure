@@ -1,136 +1,208 @@
-* {
-    box-sizing: border-box;
-}
-
-#matrixDate {
-    font-size: 14px;
-    color: #475569;
-    font-weight: 500;
-}
-
-.usWhole {
-    font-weight: 700;
-}
+/* === BASE === */
+* { box-sizing: border-box; }
 
 body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, Inter, Arial;
-    background: #f5f7fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, Arial, sans-serif;
+    background: #FAF7F2;
+    color: #1C1209;
 }
 
-html,
-body {
+html, body {
     max-width: 100%;
     overflow-x: hidden;
 }
 
-.noZoom {
-    touch-action: manipulation;
-}
+.noZoom { touch-action: manipulation; }
 
+/* === HEADER === */
 .header {
-    background: #2a2a2c;
+    background: #1C1209;
     color: white;
-    padding: 14px;
+    padding: 12px 20px;
     text-align: center;
-    font-weight: 600;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    border-bottom: 3px solid #F26522;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-height: 52px;
 }
 
+.headerLogo {
+    position: absolute;
+    left: 14px;
+    height: 38px;
+    width: auto;
+    mix-blend-mode: screen;
+    opacity: 0.9;
+}
+
+/* === SCREENS === */
 .screen {
     display: none;
-    padding: 12px
+    padding: 14px;
 }
 
-.active {
-    display: block
-}
+.active { display: block; }
 
+/* === CARDS === */
 .card {
     background: white;
-    border-radius: 14px;
-    padding: 12px;
-    margin-bottom: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(28, 18, 9, 0.07), 0 1px 2px rgba(28, 18, 9, 0.04);
+    border: 1px solid #EDE8E0;
 }
 
+/* === BUTTONS === */
 button {
     border: none;
-    border-radius: 10px;
-    padding: 12px;
-    font-size: 18px;
-    background: #2563eb;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    background: #F26522;
     color: white;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.12s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button:active {
+    transform: scale(0.96);
+    opacity: 0.85;
 }
 
 .smallBtn {
-    background: #e2e8f0;
-    color: black;
-    padding: 6px 10px;
-    font-size: 16px;
+    background: #F5F0E8;
+    color: #3D2010;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid #E8DDD2;
 }
 
 .smallBtnBlue {
-    background: #2563eb;
+    background: #F26522;
     color: white;
-    padding: 6px 10px;
-    font-size: 16px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
 }
 
+/* === GRID BUTTONS === */
 .grid {
     display: grid;
     gap: 6px;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 .grid button {
     background: white;
-    color: black;
-    border: 1px solid #e2e8f0;
-
+    color: #1C1209;
+    border: 1.5px solid #EDE8E0;
     width: 100%;
     aspect-ratio: 1;
-
     display: flex;
     align-items: center;
     justify-content: center;
-
-    font-size: clamp(16px, 3vw, 22px);
+    font-size: clamp(14px, 3vw, 20px);
+    font-weight: 500;
     padding: 0;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(28, 18, 9, 0.06);
+    transition: transform 0.1s, background 0.1s;
 }
 
-#measure .card {
-    padding: 8px;
+.grid button:active {
+    transform: scale(0.92);
+    background: #FDF5EE;
 }
+
+#measure .card { padding: 10px; }
 
 .selected {
-    background: #22c55e !important;
+    background: #F26522 !important;
     color: white !important;
+    border-color: #F26522 !important;
+    box-shadow: 0 3px 12px rgba(242, 101, 34, 0.4) !important;
 }
 
 .disabled {
-    opacity: 0.3;
+    opacity: 0.22;
     pointer-events: none;
 }
 
+/* === TOAST === */
 .toast {
     position: fixed;
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: #dcfce7;
-    color: #166534;
-    padding: 10px 18px;
-    border-radius: 10px;
+    padding: 11px 20px;
+    border-radius: 12px;
     display: none;
     z-index: 99999;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    letter-spacing: 0.1px;
 }
 
+.toast.success { background: #1E5C38; color: white; }
+.toast.warning { background: #92400E; color: #FEF3C7; }
+.toast.error   { background: #B91C1C; color: white; }
+
+/* === BOARD LIST === */
 .list {
     max-height: 220px;
     overflow: auto;
+    margin-top: 6px;
 }
 
-/* MATRIX FIX */
+.turnHeader {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9A8878;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin: 10px 0 4px;
+}
+
+.boardRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 2px;
+    border-bottom: 1px solid #F5F0E8;
+}
+
+.boardRow span {
+    font-size: 15px;
+    font-weight: 500;
+    color: #1C1209;
+}
+
+.deleteBoardBtn {
+    background: #FEE2E2;
+    color: #B91C1C;
+    padding: 4px 10px;
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 8px;
+    line-height: 1;
+    border: none;
+}
+
+/* === MATRIX === */
 .matrix {
     width: 100%;
     overflow-x: auto;
@@ -145,6 +217,7 @@ button {
 
 #matrixContainer.card {
     padding: 0;
+    overflow: hidden;
 }
 
 table {
@@ -152,58 +225,61 @@ table {
     margin: 0;
 }
 
-td,
-th {
-    border: 1px solid #ddd;
+td, th {
     width: 42px;
-    height: 42px;
+    height: 40px;
     text-align: center;
     font-size: 12px;
+    border: 1px solid rgba(237, 232, 224, 0.8);
 }
 
+/* Header cells — số chiều dài, giống hàng Tổng */
 th {
-    background: #f1f5f9;
+    background: #FEF0E8;
+    color: #C24E10;
+    font-weight: 700;
+    border-color: #EDE8E0;
 }
 
-.formGrid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px 24px;
+/* Data cells */
+td {
+    color: #1C1209;
+    background: white;
 }
 
-input {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    font-size: 16px;
+tr:nth-child(even) td {
+    background: #FAF9F6;
 }
 
-.formGrid>div {
-    min-width: 0;
+/* Ô nhãn Rộng */
+th.axisLabel {
+    background: #F5EDE3;
+    color: #7A3A10;
+    font-weight: 700;
+    border-color: #EDE8E0;
 }
 
-input:focus {
-    outline: none;
-    border-color: #2563eb;
+/* Hàng Tổng — đồng nhất với header Dài */
+.totalRow th {
+    background: #FEF0E8;
+    color: #C24E10;
+    font-weight: 700;
+    border-color: #EDE8E0;
 }
 
-.panelHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 4px;
+#matrixDate {
+    font-size: 13px;
+    color: #9A8878;
+    font-weight: 500;
 }
 
-.rangeGroup {
+.matrixStats {
     display: flex;
     gap: 20px;
-}
-
-.rangeControl {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    font-weight: 700;
+    margin-top: 8px;
+    font-size: 15px;
+    color: #1C1209;
 }
 
 .matrixToolbar {
@@ -213,85 +289,333 @@ input:focus {
     flex-wrap: wrap;
 }
 
-.checkboxRow {
+/* === FORMS === */
+.formGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
+}
+
+.formGrid > div { min-width: 0; }
+
+.fieldLabel {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #9A8878;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 6px;
+}
+
+input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1.5px solid #EDE8E0;
+    font-size: 16px;
+    background: #FAF7F2;
+    color: #1C1209;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+input:focus {
+    outline: none;
+    border-color: #F26522;
+    background: white;
+}
+
+/* === PANEL HEADER === */
+.panelHeader {
     display: flex;
     align-items: center;
-    gap: 6px;
-    white-space: nowrap;
+    justify-content: space-between;
+    margin-bottom: 6px;
 }
 
-.matrixStats {
+.panelHeader b {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1C1209;
+}
+
+.rangeGroup { display: flex; gap: 14px; }
+
+.rangeControl {
     display: flex;
-    gap: 20px;
-    font-weight: bold;
-    margin-top: 6px;
+    align-items: center;
+    gap: 5px;
 }
 
-/* ACCESS */
+.rangeControl span {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1C1209;
+    min-width: 22px;
+    text-align: center;
+}
+
+/* === TOGGLE SWITCH === */
+.toggleRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.toggleLabel {
+    font-size: 15px;
+    font-weight: 500;
+    color: #3D2010;
+}
+
+.toggle {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    flex-shrink: 0;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+    padding: 0;
+    border: none;
+}
+
+.toggleSlider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #D4C4B0;
+    border-radius: 26px;
+    transition: background 0.25s;
+}
+
+.toggleSlider::before {
+    content: "";
+    position: absolute;
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.25s;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle input:checked + .toggleSlider { background: #F26522; }
+.toggle input:checked + .toggleSlider::before { transform: translateX(20px); }
+
+/* === GRID COUNT CONTROL === */
+.gridCountRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #F0EBE3;
+}
+
+.gridCountLabel {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9A8878;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    flex: 1;
+}
+
+.gridCountVal {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1C1209;
+    min-width: 28px;
+    text-align: center;
+}
+
+/* === SUMMARY BAR === */
+.summaryBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.summaryText {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1C1209;
+}
+
+.usWhole { font-weight: 700; }
+
+/* === CONFIRM MODAL === */
+.modalOverlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(28, 18, 9, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 99998;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+
+.modalOverlay.open { display: flex; }
+
+.modalCard {
+    background: white;
+    border-radius: 20px;
+    width: 300px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: modalIn 0.2s ease;
+}
+
+@keyframes modalIn {
+    from { transform: scale(0.88); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+}
+
+.modalBody {
+    padding: 28px 24px 16px;
+    text-align: center;
+}
+
+.modalIcon { font-size: 38px; margin-bottom: 10px; }
+
+.modalTitle {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1C1209;
+    margin-bottom: 6px;
+}
+
+.modalDesc {
+    font-size: 14px;
+    color: #7A6A57;
+    line-height: 1.5;
+}
+
+.modalActions {
+    display: flex;
+    border-top: 1px solid #F5F0E8;
+}
+
+.modalActions button {
+    flex: 1;
+    padding: 16px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    transition: background 0.15s;
+}
+
+.modalActions button:active { background: #FAF7F2; transform: none; opacity: 1; }
+.btnCancel { color: #7A6A57; border-right: 1px solid #F5F0E8 !important; }
+.btnDanger { color: #B91C1C; font-weight: 700; }
+
+/* === ACCESS SCREEN === */
 #accessScreen {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(180deg, #1e293b, #0f172a);
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(160deg, #1C1209 0%, #3D1F08 60%, #2C1508 100%);
     display: none;
     align-items: center;
     justify-content: center;
     z-index: 9999;
 }
 
+.accessWrap { text-align: center; }
+
+.brandName {
+    color: #F26522;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    text-shadow: 0 2px 12px rgba(242, 101, 34, 0.4);
+}
+
+.brandSub {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: -20px;
+    margin-bottom: 24px;
+}
+
 .accessCard {
     background: white;
-    padding: 28px;
-    border-radius: 16px;
+    padding: 32px 28px;
+    border-radius: 20px;
     width: 300px;
     text-align: center;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 .accessTitle {
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 12px;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #1C1209;
 }
 
 .accessDesc {
     font-size: 14px;
-    color: #555;
-    margin-bottom: 18px;
+    color: #7A6A57;
+    margin-bottom: 20px;
+    line-height: 1.5;
 }
 
 .accessInput {
     width: 100%;
-    padding: 10px;
-    font-size: 16px;
-    border-radius: 10px;
-    border: 2px solid #e2e8f0;
+    padding: 12px;
+    font-size: 18px;
+    border-radius: 12px;
+    border: 2px solid #EDE8E0;
     outline: none;
     text-align: center;
+    background: #FAF7F2;
+    letter-spacing: 2px;
+    font-weight: 600;
+    transition: border-color 0.15s, background 0.15s;
 }
 
 .accessInput:focus {
-    border-color: #2563eb;
+    border-color: #F26522;
+    background: white;
 }
 
 .accessBtn {
-    margin-top: 14px;
+    margin-top: 16px;
     width: 100%;
-    background: #2563eb;
+    background: #F26522;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 12px;
 }
 
 .accessError {
-    margin-top: 10px;
-    color: #dc2626;
+    margin-top: 12px;
+    color: #B91C1C;
     font-size: 14px;
     min-height: 18px;
+    font-weight: 500;
 }
 
 .accessLoading {
     font-size: 13px;
-    color: #555;
-    margin-top: 6px;
+    color: #9A8878;
+    margin-top: 8px;
     min-height: 18px;
 }

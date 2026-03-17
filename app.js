@@ -12,21 +12,39 @@ function getDateTime() {
 function newTurn() {
     let lastTurnBoards = boards.filter(b => b.turn === currentTurn)
     if (lastTurnBoards.length < 1) {
-        showToast("Lượt hiện tại chưa có tấm")
+        showToast("Lượt hiện tại chưa có tấm", "warning")
         return
     }
     currentTurn++
-    showToast("Chuyển sang lượt " + currentTurn)
+    selectedLength = null
+    document.querySelectorAll("#lengthGrid button")
+        .forEach(x => x.classList.remove("selected"))
+    widthGrid.classList.add("disabled")
+    showToast("Chuyển sang lượt " + currentTurn, "success")
 }
 
 /* TOAST */
-function showToast(msg) {
+function showToast(msg, type = "success") {
     let t = document.getElementById("toast")
     t.innerText = msg
+    t.className = "toast " + type
     t.style.display = "block"
-    setTimeout(() => {
-        t.style.display = "none"
-    }, 2000)
+    setTimeout(() => { t.style.display = "none" }, 2500)
+}
+
+/* CONFIRM MODAL */
+function showConfirm(title, desc, onConfirm) {
+    document.getElementById("modalTitle").innerText = title
+    document.getElementById("modalDesc").innerText = desc
+    document.getElementById("modalConfirmBtn").onclick = function () {
+        closeConfirm()
+        onConfirm()
+    }
+    document.getElementById("confirmModal").classList.add("open")
+}
+
+function closeConfirm() {
+    document.getElementById("confirmModal").classList.remove("open")
 }
 
 /* ACCESS */
@@ -147,9 +165,7 @@ function loadState() {
 
 /* RESET */
 function confirmResetSetting() {
-    if (confirm("Bạn có chắc muốn reset cấu hình kiện?")) {
-        resetSetting()
-    }
+    showConfirm("Reset cấu hình", "Toàn bộ tấm đã nhập và cấu hình kiện sẽ bị xóa.", resetSetting)
 }
 function resetSetting() {
     bundle.value = ""
@@ -255,7 +271,7 @@ function startMeasure() {
 
 /* HEADER */
 function updateHeader() {
-    let info = [bundle.value, woodType.value, thickness.value + "cm", quality.value]
+    let info = [bundle.value, woodType.value, thickness.value + "F", quality.value]
         .filter(v => v != "")
         .join(" • ")
     headerInfo.innerText = info
@@ -358,19 +374,16 @@ function renderList() {
     turns.forEach(turn => {
         let arr = groups[turn]
         let header = document.createElement("div")
-        header.style.fontWeight = "bold"
-        header.style.marginTop = "6px"
-        header.innerText = "Lượt " + turn + " : " + arr.length + " tấm"
+        header.className = "turnHeader"
+        header.innerText = "Lượt " + turn + "  ·  " + arr.length + " tấm"
         boardList.appendChild(header)
         arr.slice().reverse().forEach((b) => {
             let index = boards.indexOf(b)
             let row = document.createElement("div")
-            row.style.display = "flex"
-            row.style.justifyContent = "space-between"
-            row.style.alignItems = "center"
+            row.className = "boardRow"
             row.innerHTML =
-                "<span>" + b.l + " x " + b.w + "</span>" +
-                "<button onclick='deleteBoard(" + index + ")'>x</button>"
+                "<span>" + b.l + " × " + b.w + "</span>" +
+                "<button class='deleteBoardBtn' onclick='deleteBoard(" + index + ")'>×</button>"
             boardList.appendChild(row)
         })
     })
@@ -382,9 +395,7 @@ function deleteBoard(i) {
     saveState()
 }
 function confirmResetBoards() {
-    if (confirm("Bạn có chắc muốn xóa toàn bộ tấm đã nhập?")) {
-        resetBoards()
-    }
+    showConfirm("Xóa dữ liệu", "Toàn bộ tấm đã nhập sẽ bị xóa.", resetBoards)
 }
 function resetBoards() {
     boards = []
@@ -397,7 +408,7 @@ function resetBoards() {
     updateSummary()
     renderList()
     saveState()
-    showToast("Đã reset dữ liệu")
+    showToast("Đã reset dữ liệu", "success")
 }
 function undo() { boards.pop(); updateSummary(); renderList(); saveState() }
 
@@ -413,7 +424,7 @@ function updateMatrixHeader() {
     boards.forEach(b => {
         vol += (b.l / 10) * (b.w / 100) * (thickness.value / 100)
     })
-    let info = [bundle.value, woodType.value, thickness.value + "cm", quality.value]
+    let info = [bundle.value, woodType.value, thickness.value + "F", quality.value]
         .filter(v => v != "")
         .join(" • ")
     matrixHeader.innerText = info
@@ -435,34 +446,8 @@ function autoScaleMatrix() {
     }
 }
 function renderMatrix() {
-    if (excelMode.checked) renderExcelMatrix()
-    else renderHeatmap()
+    renderExcelMatrix()
     setTimeout(autoScaleMatrix, 50)
-}
-
-/* HEATMAP */
-function renderHeatmap() {
-    let map = {}
-    boards.forEach(b => {
-        let key = b.w + "_" + b.l
-        map[key] = (map[key] || 0) + 1
-    })
-    let widths = [...new Set(boards.map(b => b.w))].sort((a, b) => a - b)
-    let lengths = [...new Set(boards.map(b => b.l))].sort((a, b) => a - b)
-    let html = "<table><tr><th>Rộng \\ Dài</th>"
-    lengths.forEach(l => html += "<th>" + l + "</th>")
-    html += "</tr>"
-    widths.forEach(w => {
-        html += "<tr><th>" + w + "</th>"
-        lengths.forEach(l => {
-            let v = map[w + "_" + l] || 0
-            let color = v == 0 ? "white" : v == 1 ? "#dcfce7" : v == 2 ? "#86efac" : "#22c55e"
-            html += "<td style='background:" + color + "'>" + v + "</td>"
-        })
-        html += "</tr>"
-    })
-    html += "</table>"
-    matrixContainer.innerHTML = html
 }
 
 function renderExcelMatrix() {
@@ -480,18 +465,19 @@ function renderExcelMatrix() {
             columns.push({ length: l, values: arr.slice(i, i + 10) })
         }
     })
+    let maxRows = Math.max(...columns.map(c => c.values.length))
     let html = "<table><tr>"
     /* CỘT MÔ TẢ */
-    html += "<th style='font-family:Arial;font-weight:bold'>Dài</th>"
+    html += "<th>Dài</th>"
     columns.forEach(c => {
         html += "<th>" + c.length + "</th>"
     })
     html += "</tr>"
-    /* 10 HÀNG RỘNG */
-    for (let r = 0; r < 10; r++) {
+    /* HÀNG RỘNG — tự động theo cột dài nhất */
+    for (let r = 0; r < maxRows; r++) {
         html += "<tr>"
         if (r == 0) {
-            html += "<th rowspan='10' style='font-family:Arial;font-weight:bold'>Rộng</th>"
+            html += "<th rowspan='" + maxRows + "' class='axisLabel'>Rộng</th>"
         }
         columns.forEach(c => {
             html += "<td>" + (c.values[r] || "") + "</td>"
@@ -499,7 +485,7 @@ function renderExcelMatrix() {
         html += "</tr>"
     }
     /* HÀNG TỔNG */
-    html += "<tr>"
+    html += "<tr class='totalRow'>"
     html += "<th style='font-family:Arial;font-weight:bold'>Tổng</th>"
     columns.forEach(c => {
         let sumWidth = 0
@@ -544,13 +530,13 @@ async function shareMatrixZalo() {
                     files: [file],
                     title: ""
                 })
-                showToast("Chia sẻ thành công")
+                showToast("Chia sẻ thành công", "success")
             } else {
-                showToast("Thiết bị không hỗ trợ chia sẻ")
+                showToast("Thiết bị không hỗ trợ chia sẻ", "warning")
             }
         })
     } catch (e) {
-        showToast("Chia sẻ thất bại")
+        showToast("Chia sẻ thất bại", "error")
     }
 }
 
