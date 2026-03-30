@@ -164,18 +164,22 @@
         </div>
         <div id="matrixCaptureArea">
             <div class="card">
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div id="matrixHeader"></div>
-                    <div id="matrixDate"></div>
-                </div>
-                <div class="matrixStats">
-                    <span id="matrixPieces"></span>
-                    <span id="matrixVolume"></span>
-                    <select id="bundleStatus" class="bundleStatus">
-                        <option value="-">-</option>
-                        <option value="Kiện lẻ">Kiện lẻ</option>
-                        <option value="Lẻ hết">Lẻ hết</option>
-                    </select>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                    <div style="flex:1;min-width:0">
+                        <div id="matrixHeader"></div>
+                        <div class="matrixStats">
+                            <span id="matrixPieces"></span>
+                            <span id="matrixVolume"></span>
+                        </div>
+                    </div>
+                    <div style="text-align:right;flex-shrink:0;white-space:nowrap">
+                        <div id="matrixDate"></div>
+                        <select id="bundleStatus" class="bundleStatus">
+                            <option value="-">-</option>
+                            <option value="Kiện lẻ">Kiện lẻ</option>
+                            <option value="Lẻ hết">Lẻ hết</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="matrix card" id="matrixContainer"></div>

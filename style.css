@@ -298,7 +298,7 @@ th.axisLabel {
     background-position: right 8px center;
     padding-right: 24px;
     cursor: pointer;
-    margin-left: auto;
+    margin-top: 4px;
 }
 
 .matrixToolbar {
