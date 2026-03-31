@@ -648,7 +648,7 @@ input:focus {
     cursor: pointer;
 }
 
-.usWhole { font-weight: 700; }
+.grid button.usWhole { font-weight: 800; }
 
 /* === CONFIRM MODAL === */
 .modalOverlay {
