@@ -301,6 +301,14 @@ th.axisLabel {
     margin-top: 4px;
 }
 
+.bundleStatus-text {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1C1209;
+    margin-top: 4px;
+}
+
 .matrixToolbar {
     display: flex;
     gap: 10px;

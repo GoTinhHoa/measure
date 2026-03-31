@@ -508,11 +508,18 @@ async function shareMatrixZalo() {
         let oldTransform = table ? table.style.transform : ""
         if (table) {
             table.style.transform = "scale(1)"
-            // Chỉ mở rộng el khi table rộng hơn, không bao giờ thu hẹp
             if (table.scrollWidth > el.offsetWidth) {
                 el.style.width = table.scrollWidth + "px"
             }
         }
+        /* html2canvas không render <select> — tạm thay bằng <span> */
+        let sel = document.getElementById("bundleStatus")
+        let tempSpan = document.createElement("span")
+        tempSpan.innerText = sel.value
+        tempSpan.className = "bundleStatus-text"
+        sel.style.display = "none"
+        sel.parentNode.insertBefore(tempSpan, sel.nextSibling)
+
         let canvas = await html2canvas(el, {
             scale: 3,
             scrollX: 0,
@@ -521,6 +528,9 @@ async function shareMatrixZalo() {
             windowHeight: el.scrollHeight
         })
 
+        /* Khôi phục select */
+        tempSpan.remove()
+        sel.style.display = ""
         el.style.removeProperty("width")
         if (table) table.style.transform = oldTransform
         canvas.toBlob(async function (blob) {
@@ -536,7 +546,7 @@ async function shareMatrixZalo() {
             }
         })
     } catch (e) {
-        showToast("Chia sẻ thất bại", "error")
+        showToast("Lỗi: " + e.message, "error")
     }
 }
 
