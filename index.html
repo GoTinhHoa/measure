@@ -87,9 +87,19 @@
                 <button class="smallBtn" onclick="gridPlus()">+</button>
             </div>
         </div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px;">
+        <div style="display:flex; gap:8px; margin-top:4px;">
             <button onclick="startMeasure()">Bắt đầu nhập</button>
+            <button class="smallBtn" onclick="showSavedLists()">Lịch sử</button>
             <button class="smallBtn" onclick="confirmResetSetting()">Reset</button>
+        </div>
+
+        <!-- SAVED LISTS PANEL -->
+        <div id="savedListsPanel" class="card" style="display:none">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <b style="font-size:13px;color:#9A8878;text-transform:uppercase;letter-spacing:0.5px">Lịch sử kiện</b>
+                <button class="smallBtn" onclick="closeSavedLists()">Đóng</button>
+            </div>
+            <div id="savedListsContent"></div>
         </div>
     </div>
 
@@ -116,16 +126,17 @@
                 <div class="rangeGroup">
                     <div class="rangeControl">
                         <button class="smallBtn" onclick="lenMin--; rebuild(); saveState()">−</button>
-                        <span id="lenMinLabel"></span>
+                        <span id="lenMinLabel" class="rangeVal" onclick="editRange('lenMin')"></span>
                         <button class="smallBtn" onclick="lenMin++; rebuild(); saveState()">+</button>
                     </div>
                     <div class="rangeControl">
                         <button class="smallBtn" onclick="lenMax--; rebuild(); saveState()">−</button>
-                        <span id="lenMaxLabel"></span>
+                        <span id="lenMaxLabel" class="rangeVal" onclick="editRange('lenMax')"></span>
                         <button class="smallBtn" onclick="lenMax++; rebuild(); saveState()">+</button>
                     </div>
                 </div>
             </div>
+            <div id="lenTabs" class="tabBar"></div>
             <div id="lengthGrid" class="grid"></div>
         </div>
         <div class="card">
@@ -134,21 +145,26 @@
                 <div class="rangeGroup">
                     <div class="rangeControl">
                         <button class="smallBtn" onclick="widMin--; rebuild(); saveState()">−</button>
-                        <span id="widMinLabel"></span>
+                        <span id="widMinLabel" class="rangeVal" onclick="editRange('widMin')"></span>
                         <button class="smallBtn" onclick="widMin++; rebuild(); saveState()">+</button>
                     </div>
                     <div class="rangeControl">
                         <button class="smallBtn" onclick="widMax--; rebuild(); saveState()">−</button>
-                        <span id="widMaxLabel"></span>
+                        <span id="widMaxLabel" class="rangeVal" onclick="editRange('widMax')"></span>
                         <button class="smallBtn" onclick="widMax++; rebuild(); saveState()">+</button>
                     </div>
                 </div>
             </div>
+            <div id="widTabs" class="tabBar"></div>
             <div id="widthGrid" class="grid disabled"></div>
         </div>
-        <div class="card">
-            <b style="font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Danh sách tấm</b>
-            <div id="boardList" class="list"></div>
+        <div class="card boardPanel">
+            <div class="boardLeft">
+                <div id="boardList" class="list"></div>
+            </div>
+            <div class="boardRight">
+                <div id="turnSummary"></div>
+            </div>
         </div>
     </div>
 

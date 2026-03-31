@@ -202,6 +202,161 @@ button:active {
     border: none;
 }
 
+/* === SAVED LISTS === */
+.savedListRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid #F0EBE3;
+}
+
+.savedListRow:last-child { border-bottom: none; }
+
+.savedListActive {
+    background: #FEF6F0;
+    margin: 0 -12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border-bottom-color: transparent;
+}
+
+.savedListInfo {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.savedListTitle {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1C1209;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.savedListMeta {
+    font-size: 12px;
+    color: #9A8878;
+    margin-top: 2px;
+}
+
+/* === BOARD PANEL SPLIT === */
+.boardPanel {
+    display: flex;
+    gap: 0;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.boardLeft {
+    flex: 3;
+    border-right: 1px solid #EDE8E0;
+    padding: 10px;
+    min-width: 0;
+}
+
+.boardLeft .list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.boardRight {
+    flex: 2;
+    padding: 10px;
+    min-width: 0;
+}
+
+.turnSummaryRow {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 2px;
+    font-size: 13px;
+    border-bottom: 1px solid #F5F0E8;
+}
+
+.turnSummaryLabel {
+    color: #9A8878;
+    font-weight: 600;
+}
+
+.turnSummaryVal {
+    color: #1C1209;
+    font-weight: 700;
+}
+
+/* === HIGHLIGHT BOARD === */
+@keyframes boardFlash {
+    0%   { background: #FDEBD0; }
+    100% { background: transparent; }
+}
+
+.boardRow.newBoard {
+    animation: boardFlash 1.5s ease-out;
+}
+
+/* === RANGE VALUE TAP === */
+.rangeVal {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1C1209;
+    min-width: 28px;
+    text-align: center;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 1px dashed transparent;
+    transition: border-color 0.15s;
+}
+
+.rangeVal:active {
+    border-color: #F26522;
+    background: #FEF6F0;
+}
+
+.rangeInput {
+    width: 48px;
+    padding: 2px 4px;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    border-radius: 6px;
+    border: 2px solid #F26522;
+    background: white;
+    color: #1C1209;
+}
+
+/* === TAB BAR === */
+.tabBar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.tabBar:empty { display: none; }
+
+.tabBtn {
+    padding: 5px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 20px;
+    background: #F5F0E8;
+    color: #7A6A57;
+    border: 1px solid #EDE8E0;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.tabBtn.activeTab {
+    background: #F26522;
+    color: white;
+    border-color: #F26522;
+}
+
 /* === MATRIX === */
 .matrix {
     width: 100%;

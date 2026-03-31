@@ -114,6 +114,8 @@ let lenMax = 35
 let widMin = 15
 let widMax = 35
 let woodUS = false
+let currentSessionId = null
+const MAX_SAVED_LISTS = 15
 
 /* LOCAL STORAGE */
 function saveState() {
@@ -129,9 +131,14 @@ function saveState() {
         bundle: bundle.value,
         woodType: woodType.value,
         thickness: thickness.value,
-        quality: quality.value
+        quality: quality.value,
+        sessionId: currentSessionId
     }
     localStorage.setItem("woodMeasureState", JSON.stringify(state))
+    /* Realtime sync vào saved lists */
+    if (currentSessionId && boards.length > 0) {
+        updateSavedSession()
+    }
 }
 function loadState() {
     let raw = localStorage.getItem("woodMeasureState")
@@ -154,6 +161,7 @@ function loadState() {
         widMin = state.widMin || 15
         widMax = state.widMax || 35
         woodUS = state.woodUS || false
+        currentSessionId = state.sessionId || null
         bundle.value = state.bundle || ""
         woodType.value = state.woodType || ""
         thickness.value = state.thickness || ""
@@ -161,6 +169,151 @@ function loadState() {
         document.getElementById("woodUS").checked = woodUS
         gridCount.innerText = grid
     } catch (e) { }
+}
+
+/* SAVED LISTS */
+function getSavedLists() {
+    try {
+        return JSON.parse(localStorage.getItem("woodSavedLists")) || []
+    } catch (e) { return [] }
+}
+function saveLists(lists) {
+    localStorage.setItem("woodSavedLists", JSON.stringify(lists))
+}
+
+function buildSessionData() {
+    return {
+        id: currentSessionId || Date.now(),
+        bundle: bundle.value,
+        woodType: woodType.value,
+        thickness: thickness.value,
+        quality: quality.value,
+        woodUS: woodUS,
+        boards: boards,
+        currentTurn: currentTurn,
+        grid: grid,
+        lenMin: lenMin,
+        lenMax: lenMax,
+        widMin: widMin,
+        widMax: widMax,
+        updatedAt: Date.now()
+    }
+}
+
+function saveCurrentSession() {
+    if (boards.length === 0) return
+    if (!currentSessionId) currentSessionId = Date.now()
+    let lists = getSavedLists()
+    let idx = lists.findIndex(s => s.id === currentSessionId)
+    let session = buildSessionData()
+    if (idx >= 0) {
+        lists[idx] = session
+    } else {
+        if (lists.length >= MAX_SAVED_LISTS) {
+            lists.shift()
+            showToast("Đã xóa list cũ nhất (tối đa " + MAX_SAVED_LISTS + ")", "warning")
+        }
+        lists.push(session)
+    }
+    saveLists(lists)
+}
+
+function updateSavedSession() {
+    if (!currentSessionId) return
+    let lists = getSavedLists()
+    let idx = lists.findIndex(s => s.id === currentSessionId)
+    if (idx >= 0) {
+        lists[idx] = buildSessionData()
+        saveLists(lists)
+    }
+}
+
+function loadSession(id) {
+    let lists = getSavedLists()
+    let session = lists.find(s => s.id === id)
+    if (!session) return
+    boards = session.boards || []
+    boards.forEach(b => { if (!b.turn) b.turn = 1 })
+    currentTurn = session.currentTurn || 1
+    if (boards.length > 0) {
+        currentTurn = Math.max(...boards.map(b => b.turn))
+    }
+    grid = session.grid || 6
+    lenMin = session.lenMin || 20
+    lenMax = session.lenMax || 35
+    widMin = session.widMin || 15
+    widMax = session.widMax || 35
+    woodUS = session.woodUS || false
+    currentSessionId = session.id
+    bundle.value = session.bundle || ""
+    woodType.value = session.woodType || ""
+    thickness.value = session.thickness || ""
+    quality.value = session.quality || ""
+    document.getElementById("woodUS").checked = woodUS
+    gridCount.innerText = grid
+    updateHeader()
+    rebuild()
+    go("measure")
+    updateSummary()
+    renderList()
+    saveState()
+    closeSavedLists()
+    showToast("Đã mở: " + (session.bundle || ""), "success")
+}
+
+function deleteSavedSession(id) {
+    let lists = getSavedLists()
+    lists = lists.filter(s => s.id !== id)
+    saveLists(lists)
+    if (currentSessionId === id) currentSessionId = null
+    renderSavedLists()
+}
+
+function formatDate(ts) {
+    let d = new Date(ts)
+    return String(d.getDate()).padStart(2, "0") + "/" +
+        String(d.getMonth() + 1).padStart(2, "0") + "/" +
+        d.getFullYear() + " " +
+        String(d.getHours()).padStart(2, "0") + ":" +
+        String(d.getMinutes()).padStart(2, "0")
+}
+
+function showSavedLists() {
+    renderSavedLists()
+    document.getElementById("savedListsPanel").style.display = "block"
+}
+
+function closeSavedLists() {
+    document.getElementById("savedListsPanel").style.display = "none"
+}
+
+function renderSavedLists() {
+    let el = document.getElementById("savedListsContent")
+    let lists = getSavedLists()
+    if (lists.length === 0) {
+        el.innerHTML = "<div style='color:#9A8878;font-size:13px;padding:8px 0'>Chưa có lịch sử</div>"
+        return
+    }
+    let html = ""
+    lists.slice().reverse().forEach(s => {
+        let info = [s.bundle, s.woodType, s.thickness ? s.thickness + "F" : "", s.quality]
+            .filter(v => v).join(" · ")
+        let active = s.id === currentSessionId ? " savedListActive" : ""
+        html += "<div class='savedListRow" + active + "'>"
+        html += "<div class='savedListInfo' onclick='loadSession(" + s.id + ")'>"
+        html += "<div class='savedListTitle'>" + (info || "Không tên") + "</div>"
+        html += "<div class='savedListMeta'>" + s.boards.length + " tấm · " + formatDate(s.updatedAt) + "</div>"
+        html += "</div>"
+        html += "<button class='deleteBoardBtn' onclick='confirmDeleteSession(" + s.id + ")'>×</button>"
+        html += "</div>"
+    })
+    el.innerHTML = html
+}
+
+function confirmDeleteSession(id) {
+    showConfirm("Xóa lịch sử", "List này sẽ bị xóa vĩnh viễn.", function () {
+        deleteSavedSession(id)
+    })
 }
 
 /* RESET */
@@ -261,6 +414,7 @@ function startMeasure() {
         thickness.focus()
         return
     }
+    if (!currentSessionId) currentSessionId = Date.now()
     updateHeader()
     rebuild()
     go("measure")
@@ -277,37 +431,144 @@ function updateHeader() {
     headerInfo.innerText = info
 }
 
+/* EDIT RANGE — tap vào số min/max để nhập trực tiếp */
+function getRangeVar(name) {
+    if (name === "lenMin") return lenMin
+    if (name === "lenMax") return lenMax
+    if (name === "widMin") return widMin
+    if (name === "widMax") return widMax
+}
+function setRangeVar(name, val) {
+    if (name === "lenMin") lenMin = val
+    else if (name === "lenMax") lenMax = val
+    else if (name === "widMin") widMin = val
+    else if (name === "widMax") widMax = val
+}
+function editRange(varName) {
+    let labelEl = document.getElementById(varName + "Label")
+    let currentVal = getRangeVar(varName)
+    let input = document.createElement("input")
+    input.type = "number"
+    input.value = currentVal
+    input.className = "rangeInput"
+    input.id = varName + "Label"
+    labelEl.replaceWith(input)
+    input.focus()
+    input.select()
+    let applied = false
+    function apply() {
+        if (applied) return
+        applied = true
+        let val = parseInt(input.value)
+        if (!isNaN(val) && val >= 0) {
+            setRangeVar(varName, val)
+        }
+        rebuild()
+        saveState()
+    }
+    input.onblur = apply
+    input.onkeydown = function (e) {
+        if (e.key === "Enter") { input.blur() }
+    }
+}
+
+/* TAB STATE */
+let lenActiveTab = "all"
+let widActiveTab = "all"
+const TAB_THRESHOLD = 24
+
 /* BUILD GRID */
 function rebuild() {
-    lenMinLabel.innerText = lenMin
-    lenMaxLabel.innerText = lenMax
-    widMinLabel.innerText = widMin
-    widMaxLabel.innerText = widMax
+    setRangeLabel("lenMin", lenMin)
+    setRangeLabel("lenMax", lenMax)
+    setRangeLabel("widMin", widMin)
+    setRangeLabel("widMax", widMax)
     createButtons()
     saveState()
 }
+
+function setRangeLabel(varName, value) {
+    let el = document.getElementById(varName + "Label")
+    if (!el || el.tagName === "INPUT") {
+        let span = document.createElement("span")
+        span.id = varName + "Label"
+        span.className = "rangeVal"
+        span.onclick = function () { editRange(varName) }
+        span.innerText = value
+        if (el) el.replaceWith(span)
+    } else {
+        el.innerText = value
+    }
+}
+
+function buildValues(min, max, isUS) {
+    let values = []
+    for (let i = min; i <= max; i++) {
+        values.push(i)
+        if (isUS) {
+            values.push(Number((i + 0.3).toFixed(1)))
+            values.push(Number((i + 0.5).toFixed(1)))
+            values.push(Number((i + 0.7).toFixed(1)))
+        }
+    }
+    return values
+}
+
+function buildWidthValues(min, max, isUS) {
+    let values = []
+    for (let i = min; i <= max; i++) {
+        values.push(i)
+        if (isUS) {
+            values.push(Number((i + 0.5).toFixed(1)))
+        }
+    }
+    return values
+}
+
+function getDecadeTabs(values) {
+    let decades = [...new Set(values.map(v => Math.floor(v / 10) * 10))]
+    decades.sort((a, b) => a - b)
+    return decades
+}
+
+function renderTabs(tabBarId, values, activeTab, onSelect) {
+    let tabBar = document.getElementById(tabBarId)
+    tabBar.innerHTML = ""
+    if (values.length <= TAB_THRESHOLD) return
+    let decades = getDecadeTabs(values)
+    decades.forEach(d => {
+        let btn = document.createElement("button")
+        btn.className = "tabBtn" + (activeTab === d ? " activeTab" : "")
+        btn.innerText = d + "s"
+        btn.onclick = () => onSelect(d)
+        tabBar.appendChild(btn)
+    })
+}
+
 function createButtons() {
     lengthGrid.innerHTML = ""
     widthGrid.innerHTML = ""
     lengthGrid.style.gridTemplateColumns = "repeat(" + grid + ",1fr)"
     widthGrid.style.gridTemplateColumns = "repeat(" + grid + ",1fr)"
-    let lengths = []
-    for (let i = lenMin; i <= lenMax; i++) {
-        lengths.push(i)
-        if (woodUS) {
-            lengths.push(Number((i + 0.3).toFixed(1)))
-            lengths.push(Number((i + 0.5).toFixed(1)))
-            lengths.push(Number((i + 0.7).toFixed(1)))
-        }
+
+    /* Dài */
+    let allLengths = buildValues(lenMin, lenMax, woodUS)
+    renderTabs("lenTabs", allLengths, lenActiveTab, function (d) {
+        lenActiveTab = d; createButtons()
+    })
+    let lengths = allLengths
+    if (allLengths.length > TAB_THRESHOLD) {
+        if (lenActiveTab === "all") lenActiveTab = getDecadeTabs(allLengths)[0]
+        lengths = allLengths.filter(v => Math.floor(v / 10) * 10 === lenActiveTab)
     }
+
     lengths.forEach(v => {
         let b = document.createElement("button")
         b.innerText = v
-
-        /* gỗ Mỹ: số nguyên in đậm */
         if (woodUS && Number.isInteger(v)) {
             b.classList.add("usWhole")
         }
+        if (v === selectedLength) b.classList.add("selected")
         b.onclick = () => {
             speakNumber(v)
             selectedLength = v
@@ -318,17 +579,21 @@ function createButtons() {
         }
         lengthGrid.appendChild(b)
     })
-    let widths = []
-    for (let i = widMin; i <= widMax; i++) {
-        widths.push(i)
-        if (woodUS) {
-            widths.push(Number((i + 0.5).toFixed(1)))
-        }
+
+    /* Rộng */
+    let allWidths = buildWidthValues(widMin, widMax, woodUS)
+    renderTabs("widTabs", allWidths, widActiveTab, function (d) {
+        widActiveTab = d; createButtons()
+    })
+    let widths = allWidths
+    if (allWidths.length > TAB_THRESHOLD) {
+        if (widActiveTab === "all") widActiveTab = getDecadeTabs(allWidths)[0]
+        widths = allWidths.filter(v => Math.floor(v / 10) * 10 === widActiveTab)
     }
+
     widths.forEach(v => {
         let b = document.createElement("button")
         b.innerText = v
-        /* gỗ Mỹ: số nguyên in đậm */
         if (woodUS && Number.isInteger(v)) {
             b.classList.add("usWhole")
         }
@@ -345,7 +610,7 @@ function createButtons() {
                 .forEach(x => x.classList.remove("selected"))
             widthGrid.classList.add("disabled")
             updateSummary()
-            renderList()
+            renderList(true)
             saveState()
         }
         widthGrid.appendChild(b)
@@ -362,9 +627,11 @@ function updateSummary() {
 }
 
 /* LIST */
-function renderList() {
+function renderList(highlightNew) {
     boardList.innerHTML = ""
+    document.getElementById("turnSummary").innerHTML = ""
     if (boards.length === 0) return
+    let lastIndex = highlightNew ? boards.length - 1 : -1
     let groups = {}
     boards.forEach(b => {
         if (!groups[b.turn]) groups[b.turn] = []
@@ -380,12 +647,25 @@ function renderList() {
         arr.slice().reverse().forEach((b) => {
             let index = boards.indexOf(b)
             let row = document.createElement("div")
-            row.className = "boardRow"
+            row.className = "boardRow" + (index === lastIndex ? " newBoard" : "")
             row.innerHTML =
                 "<span>" + b.l + " × " + b.w + "</span>" +
                 "<button class='deleteBoardBtn' onclick='deleteBoard(" + index + ")'>×</button>"
             boardList.appendChild(row)
         })
+    })
+    renderTurnSummary(groups)
+}
+function renderTurnSummary(groups) {
+    let el = document.getElementById("turnSummary")
+    el.innerHTML = ""
+    let turns = Object.keys(groups).sort((a, b) => b - a)
+    turns.forEach(turn => {
+        let row = document.createElement("div")
+        row.className = "turnSummaryRow"
+        row.innerHTML = "<span class='turnSummaryLabel'>L" + turn + "</span>" +
+            "<span class='turnSummaryVal'>" + groups[turn].length + " tấm</span>"
+        el.appendChild(row)
     })
 }
 function deleteBoard(i) {
@@ -395,12 +675,14 @@ function deleteBoard(i) {
     saveState()
 }
 function confirmResetBoards() {
-    showConfirm("Xóa dữ liệu", "Toàn bộ tấm đã nhập sẽ bị xóa.", resetBoards)
+    showConfirm("Lưu & Reset", "Session hiện tại sẽ được lưu vào lịch sử và bắt đầu kiện mới.", resetBoards)
 }
 function resetBoards() {
+    /* Lưu session hiện tại trước khi reset */
+    saveCurrentSession()
     boards = []
-    /* reset lượt về 1 */
     currentTurn = 1
+    currentSessionId = null
     selectedLength = null
     document.querySelectorAll("#lengthGrid button")
         .forEach(x => x.classList.remove("selected"))
@@ -408,7 +690,7 @@ function resetBoards() {
     updateSummary()
     renderList()
     saveState()
-    showToast("Đã reset dữ liệu", "success")
+    showToast("Đã lưu & reset", "success")
 }
 function undo() { boards.pop(); updateSummary(); renderList(); saveState() }
 
@@ -562,6 +844,12 @@ window.addEventListener("load", async function () {
     rebuild()
     updateSummary()
     renderList()
+    /* Nếu đang có session → lưu & vào Measure */
+    if (boards.length > 0 && bundle.value.trim() !== "") {
+        saveCurrentSession()
+        updateHeader()
+        go("measure")
+    }
 })
 
 if ("serviceWorker" in navigator) {
