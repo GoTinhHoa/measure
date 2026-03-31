@@ -9,18 +9,41 @@ function getDateTime() {
 }
 
 /* TURN */
-function newTurn() {
+let activeTurn = 1
+
+function addNewTurn() {
     let lastTurnBoards = boards.filter(b => b.turn === currentTurn)
     if (lastTurnBoards.length < 1) {
         showToast("Lượt hiện tại chưa có tấm", "warning")
         return
     }
     currentTurn++
+    activeTurn = currentTurn
     selectedLength = null
     document.querySelectorAll("#lengthGrid button")
         .forEach(x => x.classList.remove("selected"))
     widthGrid.classList.add("disabled")
+    updateTurnSelect()
     showToast("Chuyển sang lượt " + currentTurn, "success")
+}
+
+function onTurnSelect() {
+    activeTurn = parseInt(document.getElementById("turnSelect").value)
+    showToast("Nhập vào lượt " + activeTurn, "success")
+}
+
+function updateTurnSelect() {
+    let sel = document.getElementById("turnSelect")
+    if (!sel) return
+    sel.innerHTML = ""
+    for (let t = currentTurn; t >= 1; t--) {
+        let count = boards.filter(b => b.turn === t).length
+        let opt = document.createElement("option")
+        opt.value = t
+        opt.innerText = "L" + t + " (" + count + ")"
+        if (t === activeTurn) opt.selected = true
+        sel.appendChild(opt)
+    }
 }
 
 /* TOAST */
@@ -155,6 +178,7 @@ function loadState() {
         if (boards.length > 0) {
             currentTurn = Math.max(...boards.map(b => b.turn))
         }
+        activeTurn = currentTurn
         grid = state.grid || 6
         lenMin = state.lenMin || 20
         lenMax = state.lenMax || 35
@@ -238,6 +262,7 @@ function loadSession(id) {
     if (boards.length > 0) {
         currentTurn = Math.max(...boards.map(b => b.turn))
     }
+    activeTurn = currentTurn
     grid = session.grid || 6
     lenMin = session.lenMin || 20
     lenMax = session.lenMax || 35
@@ -603,7 +628,7 @@ function createButtons() {
             boards.push({
                 l: selectedLength,
                 w: v,
-                turn: currentTurn
+                turn: activeTurn
             })
             selectedLength = null
             document.querySelectorAll("#lengthGrid button")
@@ -655,6 +680,7 @@ function renderList(highlightNew) {
         })
     })
     renderTurnSummary(groups)
+    updateTurnSelect()
 }
 function renderTurnSummary(groups) {
     let el = document.getElementById("turnSummary")
@@ -682,6 +708,7 @@ function resetBoards() {
     saveCurrentSession()
     boards = []
     currentTurn = 1
+    activeTurn = 1
     currentSessionId = null
     selectedLength = null
     document.querySelectorAll("#lengthGrid button")
@@ -690,6 +717,7 @@ function resetBoards() {
     updateSummary()
     renderList()
     saveState()
+    go("setup")
     showToast("Đã lưu & reset", "success")
 }
 function undo() { boards.pop(); updateSummary(); renderList(); saveState() }

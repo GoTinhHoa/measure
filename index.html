@@ -87,14 +87,14 @@
                 <button class="smallBtn" onclick="gridPlus()">+</button>
             </div>
         </div>
-        <div style="display:flex; gap:8px; margin-top:4px;">
+        <div style="display:flex; justify-content:space-between; margin-top:4px;">
             <button onclick="startMeasure()">Bắt đầu nhập</button>
             <button class="smallBtn" onclick="showSavedLists()">Lịch sử</button>
             <button class="smallBtn" onclick="confirmResetSetting()">Reset</button>
         </div>
 
         <!-- SAVED LISTS PANEL -->
-        <div id="savedListsPanel" class="card" style="display:none">
+        <div id="savedListsPanel" class="card" style="display:none;margin-top:12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                 <b style="font-size:13px;color:#9A8878;text-transform:uppercase;letter-spacing:0.5px">Lịch sử kiện</b>
                 <button class="smallBtn" onclick="closeSavedLists()">Đóng</button>
@@ -109,15 +109,18 @@
             <img src="logo-192.png" class="headerLogo">
             <span id="headerInfo"></span>
         </div>
-        <div class="card">
+        <div class="card" style="display:flex;justify-content:space-between">
             <button class="smallBtn" onclick="go('setup')">← Cấu hình</button>
-            <button class="smallBtn" onclick="confirmResetBoards()">Reset</button>
+            <button class="smallBtn" onclick="confirmResetBoards()">Kiện mới</button>
             <button class="smallBtnBlue" onclick="showMatrix()">List →</button>
         </div>
         <div class="card">
             <div class="summaryBar">
                 <span class="summaryText" id="summary"></span>
-                <button class="smallBtn" onclick="newTurn()">Lượt mới</button>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <select id="turnSelect" class="turnSelect" onchange="onTurnSelect()"></select>
+                    <button class="smallBtn" onclick="addNewTurn()">+ Lượt</button>
+                </div>
             </div>
         </div>
         <div class="card">
