@@ -70,20 +70,30 @@ function closeConfirm() {
     document.getElementById("confirmModal").classList.remove("open")
 }
 
-/* ACCESS */
-async function fetchAccessList() {
-    try {
-        let res = await fetch("device.json?ts=" + Date.now())
-        let data = await res.json()
-        if (!data || !data.codes) return []
-        return data.codes
-    } catch (e) {
-        return []
-    }
-}
+/* SUPABASE */
+const SUPABASE_URL = "https://kpwyzwttmlzyojuxihto.supabase.co"
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd3l6d3R0bWx6eW9qdXhpaHRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4Njk2NDAsImV4cCI6MjA5MDQ0NTY0MH0.xNyFnI7mZoNqB0w0hB9g3VSeOSwU2X8VatOY6xlThJg"
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+let currentUser = ""
+
+/* ACCESS — v2: dùng Supabase thay device.json */
+const ACCESS_KEY = "woodAccessCode_v2"
+
 async function validateAccessCode(code) {
-    let codes = await fetchAccessList()
-    return codes.includes(code)
+    try {
+        let { data } = await sb.from("measure_devices")
+            .select("user_name")
+            .eq("code", code.toLowerCase().trim())
+            .eq("active", true)
+            .single()
+        if (data) {
+            currentUser = data.user_name
+            return true
+        }
+        return false
+    } catch (e) {
+        return false
+    }
 }
 async function checkAccessCode() {
     let input = document.getElementById("accessInput")
@@ -102,7 +112,7 @@ async function checkAccessCode() {
     btn.disabled = false
     loading.innerText = ""
     if (ok) {
-        localStorage.setItem("woodAccessCode", code)
+        localStorage.setItem(ACCESS_KEY, JSON.stringify({ code: code.toLowerCase().trim(), user: currentUser }))
         document.getElementById("accessScreen").style.display = "none"
     } else {
         error.innerText = "Mã không hợp lệ"
@@ -113,17 +123,56 @@ async function checkAccessCode() {
     }
 }
 async function verifySavedAccess() {
-    let savedCode = localStorage.getItem("woodAccessCode")
-    if (!savedCode) {
+    let raw = localStorage.getItem(ACCESS_KEY)
+    if (!raw) {
         document.getElementById("accessScreen").style.display = "flex"
         setTimeout(() => accessInput.focus(), 200)
         return
     }
-    let ok = await validateAccessCode(savedCode)
-    if (!ok) {
-        localStorage.removeItem("woodAccessCode")
+    try {
+        let saved = JSON.parse(raw)
+        let ok = await validateAccessCode(saved.code)
+        if (!ok) {
+            localStorage.removeItem(ACCESS_KEY)
+            document.getElementById("accessScreen").style.display = "flex"
+            setTimeout(() => accessInput.focus(), 200)
+        }
+    } catch (e) {
+        localStorage.removeItem(ACCESS_KEY)
         document.getElementById("accessScreen").style.display = "flex"
         setTimeout(() => accessInput.focus(), 200)
+    }
+}
+
+/* SYNC lên hệ thống */
+function calcVolume() {
+    let vol = 0
+    boards.forEach(b => {
+        vol += (b.l / 10) * (b.w / 100) * (thickness.value / 100)
+    })
+    return parseFloat(vol.toFixed(6))
+}
+
+async function syncToSystem() {
+    if (!currentUser || !currentSessionId || boards.length === 0) return
+    try {
+        await sb.from("bundle_measurements").upsert({
+            session_id: currentSessionId,
+            bundle_code: bundle.value.trim(),
+            wood_type: woodType.value.trim(),
+            thickness: parseFloat(thickness.value) || 0,
+            quality: quality.value.trim(),
+            boards: boards,
+            board_count: boards.length,
+            volume: calcVolume(),
+            measured_by: currentUser,
+            status: "chờ gán",
+            deleted: false,
+            updated_at: new Date().toISOString()
+        }, { onConflict: "session_id" })
+        showToast("Đã đồng bộ ✓", "success")
+    } catch (e) {
+        /* im lặng — không ảnh hưởng flow Zalo */
     }
 }
 
@@ -851,6 +900,7 @@ async function shareMatrixZalo() {
                     title: ""
                 })
                 showToast("Chia sẻ thành công", "success")
+                syncToSystem()
             } else {
                 showToast("Thiết bị không hỗ trợ chia sẻ", "warning")
             }
