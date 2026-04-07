@@ -11,6 +11,28 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <title>Đo Gỗ V4</title>
     <link rel="stylesheet" href="style.css">
+    <script>
+        /* Force update khi phiên bản cũ — chạy trước mọi thứ */
+        (function () {
+            var APP_VERSION = "4.1";
+            var stored = localStorage.getItem("appVersion");
+            if (stored !== APP_VERSION) {
+                localStorage.setItem("appVersion", APP_VERSION);
+                if ("serviceWorker" in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function (regs) {
+                        regs.forEach(function (r) { r.unregister(); });
+                        caches.keys().then(function (keys) {
+                            Promise.all(keys.map(function (k) { return caches.delete(k); })).then(function () {
+                                location.reload(true);
+                            });
+                        });
+                    });
+                } else {
+                    location.reload(true);
+                }
+            }
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
