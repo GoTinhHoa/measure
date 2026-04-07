@@ -71,8 +71,8 @@ function closeConfirm() {
 }
 
 /* SUPABASE */
-const SUPABASE_URL = "https://kpwyzwttmlzyojuxihto.supabase.co"
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd3l6d3R0bWx6eW9qdXhpaHRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4Njk2NDAsImV4cCI6MjA5MDQ0NTY0MH0.xNyFnI7mZoNqB0w0hB9g3VSeOSwU2X8VatOY6xlThJg"
+const SUPABASE_URL = "https://tscddgjkelnmlitzcxyg.supabase.co"
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzY2RkZ2prZWxubWxpdHpjeHlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzY3OTIsImV4cCI6MjA4OTE1Mjc5Mn0.ClRzHXGwMqRAc_ZMCGxBKfRJ5L2HmKdGMpzeFc9Mva0"
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 let currentUser = ""
 
