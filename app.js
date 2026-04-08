@@ -176,6 +176,43 @@ async function syncToSystem() {
     }
 }
 
+/* LOOKUP mã kiện NCC → auto-fill loại gỗ, dày, chất lượng */
+let lastLookupCode = ""
+async function lookupBundle() {
+    let code = bundle.value.trim()
+    if (!code || code === lastLookupCode) return
+    lastLookupCode = code
+    let statusEl = document.getElementById("bundleLookupStatus")
+    statusEl.innerHTML = "<span style='color:#9A8878'>Đang tìm...</span>"
+    try {
+        let { data } = await sb.from("wood_bundles")
+            .select("supplier_bundle_code, wood_id, attributes, wood_types(name)")
+            .or("supplier_bundle_code.eq." + code + ",supplier_bundle_code.ilike." + code)
+            .limit(1)
+            .single()
+        if (data) {
+            let wName = data.wood_types?.name || ""
+            let attrs = data.attributes || {}
+            let thick = attrs.thickness || ""
+            let qual = attrs.quality || ""
+            if (wName) woodType.value = wName.toUpperCase()
+            if (thick) {
+                /* Thickness lưu dạng "2F" — lấy số trước ký tự F */
+                let match = thick.match(/^([\d.]+)/)
+                if (match) thickness.value = match[1]
+                else thickness.value = thick
+            }
+            if (qual) quality.value = qual.toUpperCase()
+            statusEl.innerHTML = "<span style='color:#1E5C38'>✓ " + wName + " · " + thick + " · " + qual + "</span>"
+            saveState()
+        } else {
+            statusEl.innerHTML = "<span style='color:#92400E'>Không tìm thấy — nhập thủ công</span>"
+        }
+    } catch (e) {
+        statusEl.innerHTML = "<span style='color:#92400E'>Không tìm thấy — nhập thủ công</span>"
+    }
+}
+
 /* STATE */
 let boards = []
 let selectedLength = null

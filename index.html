@@ -81,7 +81,8 @@
             <div class="formGrid">
                 <div>
                     <label class="fieldLabel">Mã kiện</label>
-                    <input id="bundle" oninput="this.value=this.value.toUpperCase()">
+                    <input id="bundle" oninput="this.value=this.value.toUpperCase()" onblur="lookupBundle()">
+                    <div id="bundleLookupStatus" style="font-size:11px;margin-top:3px;min-height:16px"></div>
                 </div>
                 <div>
                     <label class="fieldLabel">Loại gỗ</label>
