@@ -186,12 +186,17 @@ async function lookupBundle() {
     statusEl.innerHTML = "<span style='color:#9A8878'>Đang tìm...</span>"
     try {
         let { data } = await sb.from("wood_bundles")
-            .select("supplier_bundle_code, wood_id, attributes, wood_types(name)")
+            .select("supplier_bundle_code, wood_id, attributes")
             .or("supplier_bundle_code.eq." + code + ",supplier_bundle_code.ilike." + code)
             .limit(1)
             .single()
         if (data) {
-            let wName = data.wood_types?.name || ""
+            /* Lấy tên gỗ tiếng Việt từ wood_types */
+            let wName = data.wood_id || ""
+            try {
+                let { data: wt } = await sb.from("wood_types").select("name").eq("id", data.wood_id).single()
+                if (wt) wName = wt.name
+            } catch (e2) {}
             let attrs = data.attributes || {}
             let thick = attrs.thickness || ""
             let qual = attrs.quality || ""
