@@ -68,6 +68,34 @@ function showConfirm(title, desc, onConfirm) {
 
 function closeConfirm() {
     document.getElementById("confirmModal").classList.remove("open")
+    let inp = document.getElementById("modalInput")
+    let err = document.getElementById("modalInputError")
+    if (inp) { inp.style.display = "none"; inp.value = "" }
+    if (err) err.style.display = "none"
+}
+
+function showConfirmWithInput(title, desc, placeholder, expectedValue, onConfirm) {
+    document.getElementById("modalTitle").innerText = title
+    document.getElementById("modalDesc").innerText = desc
+    let inp = document.getElementById("modalInput")
+    let err = document.getElementById("modalInputError")
+    inp.style.display = "block"
+    inp.value = ""
+    inp.placeholder = placeholder
+    err.style.display = "none"
+    document.getElementById("modalConfirmBtn").onclick = function () {
+        if (inp.value.trim().toLowerCase() !== expectedValue.toLowerCase()) {
+            err.style.display = "block"
+            err.innerText = 'Nhập "' + expectedValue + '" để xác nhận'
+            inp.focus()
+            if (navigator.vibrate) navigator.vibrate(100)
+            return
+        }
+        closeConfirm()
+        onConfirm()
+    }
+    document.getElementById("confirmModal").classList.add("open")
+    setTimeout(() => inp.focus(), 200)
 }
 
 /* SUPABASE */
@@ -75,6 +103,7 @@ const SUPABASE_URL = "https://tscddgjkelnmlitzcxyg.supabase.co"
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzY2RkZ2prZWxubWxpdHpjeHlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NzY3OTIsImV4cCI6MjA4OTE1Mjc5Mn0.ClRzHXGwMqRAc_ZMCGxBKfRJ5L2HmKdGMpzeFc9Mva0"
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 let currentUser = ""
+let currentMeasurementType = "order_split" // 'order_split' | 'whole_bundle'
 
 /* ACCESS — v2: dùng Supabase thay device.json */
 const ACCESS_KEY = "woodAccessCode_v2"
@@ -82,12 +111,14 @@ const ACCESS_KEY = "woodAccessCode_v2"
 async function validateAccessCode(code) {
     try {
         let { data } = await sb.from("measure_devices")
-            .select("user_name")
+            .select("user_name, default_type")
             .eq("code", code.toLowerCase().trim())
             .eq("active", true)
             .single()
         if (data) {
             currentUser = data.user_name
+            currentMeasurementType = data.default_type || "order_split"
+            updateMeasurementTypeUI()
             return true
         }
         return false
@@ -112,7 +143,7 @@ async function checkAccessCode() {
     btn.disabled = false
     loading.innerText = ""
     if (ok) {
-        localStorage.setItem(ACCESS_KEY, JSON.stringify({ code: code.toLowerCase().trim(), user: currentUser }))
+        localStorage.setItem(ACCESS_KEY, JSON.stringify({ code: code.toLowerCase().trim(), user: currentUser, defaultType: currentMeasurementType }))
         document.getElementById("accessScreen").style.display = "none"
     } else {
         error.innerText = "Mã không hợp lệ"
@@ -166,6 +197,7 @@ async function syncToSystem() {
             board_count: boards.length,
             volume: calcVolume(),
             measured_by: currentUser,
+            measurement_type: currentMeasurementType,
             status: "chờ gán",
             deleted: false,
             updated_at: new Date().toISOString()
@@ -174,6 +206,40 @@ async function syncToSystem() {
     } catch (e) {
         /* im lặng — không ảnh hưởng flow Zalo */
     }
+}
+
+/* Measurement type toggle */
+function updateMeasurementTypeUI() {
+    let chk = document.getElementById("measureTypeCheck")
+    let labelNK = document.querySelector("#measureTypeCheck")?.parentElement?.previousElementSibling
+    let labelSL = document.querySelector("#measureTypeCheck")?.parentElement?.nextElementSibling
+    if (!chk) return
+    let isWhole = currentMeasurementType === "whole_bundle"
+    chk.checked = !isWhole // checked = soạn lẻ (right side), unchecked = nguyên kiện (left side)
+    if (labelNK) labelNK.style.color = isWhole ? "#3D2010" : "#9A8878"
+    if (labelNK) labelNK.style.fontWeight = isWhole ? "700" : "500"
+    if (labelSL) labelSL.style.color = !isWhole ? "#3D2010" : "#9A8878"
+    if (labelSL) labelSL.style.fontWeight = !isWhole ? "700" : "500"
+}
+function onMeasureTypeToggle() {
+    let chk = document.getElementById("measureTypeCheck")
+    let newType = chk.checked ? "order_split" : "whole_bundle"
+    let isWhole = newType === "whole_bundle"
+    let label = isWhole ? "Kiện nguyên (nhập kho)" : "Soạn lẻ (đơn hàng)"
+    let keyword = isWhole ? "nguyên" : "lẻ"
+    // revert toggle ngay, chỉ apply khi confirm thành công
+    chk.checked = !chk.checked
+    showConfirmWithInput(
+        "Đổi loại kiện",
+        'Chuyển sang: ' + label + '\nNhập "' + keyword + '" để xác nhận.',
+        keyword,
+        keyword,
+        function () {
+            currentMeasurementType = newType
+            updateMeasurementTypeUI()
+            saveState()
+        }
+    )
 }
 
 /* LOOKUP mã kiện NCC → auto-fill loại gỗ, dày, chất lượng */
@@ -246,7 +312,8 @@ function saveState() {
         woodType: woodType.value,
         thickness: thickness.value,
         quality: quality.value,
-        sessionId: currentSessionId
+        sessionId: currentSessionId,
+        measurementType: currentMeasurementType
     }
     localStorage.setItem("woodMeasureState", JSON.stringify(state))
     /* Realtime sync vào saved lists */
@@ -283,6 +350,10 @@ function loadState() {
         quality.value = state.quality || ""
         document.getElementById("woodUS").checked = woodUS
         gridCount.innerText = grid
+        if (state.measurementType) {
+            currentMeasurementType = state.measurementType
+            updateMeasurementTypeUI()
+        }
     } catch (e) { }
 }
 
@@ -805,6 +876,10 @@ function resetBoards() {
     document.querySelectorAll("#lengthGrid button")
         .forEach(x => x.classList.remove("selected"))
     widthGrid.classList.add("disabled")
+    bundle.value = ""
+    woodType.value = ""
+    thickness.value = ""
+    quality.value = ""
     updateSummary()
     renderList()
     saveState()

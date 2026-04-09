@@ -47,6 +47,8 @@
                 <div class="modalIcon">⚠️</div>
                 <div class="modalTitle" id="modalTitle"></div>
                 <div class="modalDesc" id="modalDesc"></div>
+                <input id="modalInput" style="display:none;width:100%;padding:10px 12px;border:2px solid #D4B896;border-radius:8px;font-size:16px;text-align:center;font-weight:700;margin-top:10px;outline:none;box-sizing:border-box;letter-spacing:2px" autocomplete="off" autocorrect="off">
+                <div id="modalInputError" style="display:none;color:#DC2626;font-size:12px;margin-top:4px;font-weight:600"></div>
             </div>
             <div class="modalActions">
                 <button class="btnCancel" onclick="closeConfirm()">Hủy</button>
@@ -97,12 +99,22 @@
                     <input id="quality" oninput="this.value=this.value.toUpperCase()">
                 </div>
             </div>
-            <div class="toggleRow" style="margin-top:16px">
-                <label class="toggle">
-                    <input type="checkbox" id="woodUS" onchange="toggleWoodUS()">
-                    <span class="toggleSlider"></span>
-                </label>
-                <span class="toggleLabel">Gỗ Mỹ</span>
+            <div class="toggleRow" style="margin-top:16px;justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <label class="toggle">
+                        <input type="checkbox" id="woodUS" onchange="toggleWoodUS()">
+                        <span class="toggleSlider"></span>
+                    </label>
+                    <span class="toggleLabel">Gỗ Mỹ</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="toggleLabel" style="font-size:13px">Kiện nguyên</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="measureTypeCheck" onchange="onMeasureTypeToggle()">
+                        <span class="toggleSlider" id="measureTypeSlider"></span>
+                    </label>
+                    <span class="toggleLabel" style="font-size:13px;color:var(--tm,#9A8878)">Soạn lẻ</span>
+                </div>
             </div>
             <div class="gridCountRow">
                 <span class="gridCountLabel">Số nút / hàng</span>
