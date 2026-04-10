@@ -175,6 +175,67 @@ async function verifySavedAccess() {
     }
 }
 
+/* WOOD TYPE PICKER — load danh sách gỗ từ DB */
+async function loadWoodTypes() {
+    try {
+        let { data } = await sb.from("wood_types").select("id, name").order("name")
+        woodTypeList = (data || []).map(w => ({ id: w.id, name: w.name }))
+        renderWoodTypeDropdown()
+    } catch (e) { /* silent */ }
+}
+
+function renderWoodTypeDropdown() {
+    let container = document.getElementById("woodTypePickerList")
+    if (!container) return
+    container.innerHTML = ""
+    woodTypeList.forEach(w => {
+        let item = document.createElement("div")
+        item.className = "woodTypeItem" + (selectedWoodId === w.id ? " active" : "")
+        item.innerText = w.name
+        item.onclick = function () { selectWoodType(w.id, w.name) }
+        container.appendChild(item)
+    })
+}
+
+function selectWoodType(id, name) {
+    selectedWoodId = id
+    woodType.value = name.toUpperCase()
+    document.getElementById("woodTypePicker").classList.remove("open")
+    renderWoodTypeDropdown()
+    saveState()
+}
+
+function openWoodTypePicker() {
+    let picker = document.getElementById("woodTypePicker")
+    picker.classList.add("open")
+    let searchInput = document.getElementById("woodTypeSearch")
+    searchInput.value = ""
+    filterWoodTypes("")
+    setTimeout(() => searchInput.focus(), 100)
+}
+
+function filterWoodTypes(query) {
+    let container = document.getElementById("woodTypePickerList")
+    if (!container) return
+    container.innerHTML = ""
+    let q = query.toLowerCase().trim()
+    let filtered = q ? woodTypeList.filter(w => w.name.toLowerCase().includes(q) || w.id.toLowerCase().includes(q)) : woodTypeList
+    filtered.forEach(w => {
+        let item = document.createElement("div")
+        item.className = "woodTypeItem" + (selectedWoodId === w.id ? " active" : "")
+        item.innerText = w.name
+        item.onclick = function () { selectWoodType(w.id, w.name) }
+        container.appendChild(item)
+    })
+    if (!filtered.length) {
+        let empty = document.createElement("div")
+        empty.className = "woodTypeItem"
+        empty.style.color = "#9A8878"
+        empty.innerText = "Không tìm thấy"
+        container.appendChild(empty)
+    }
+}
+
 /* SYNC lên hệ thống */
 function calcVolume() {
     let vol = 0
@@ -186,11 +247,48 @@ function calcVolume() {
 
 async function syncToSystem() {
     if (!currentUser || !currentSessionId || boards.length === 0) return
+    let bundleCode = bundle.value.trim()
     try {
+        // Chống trùng: kiểm tra mã kiện đã tồn tại ở session khác chưa
+        let { data: existing } = await sb.from("bundle_measurements")
+            .select("id, session_id, board_count, volume")
+            .eq("bundle_code", bundleCode)
+            .eq("deleted", false)
+            .neq("session_id", currentSessionId)
+            .eq("status", "chờ gán")
+        if (existing && existing.length > 0) {
+            let ex = existing[0]
+            let sameCounts = ex.board_count === boards.length && Math.abs(parseFloat(ex.volume) - calcVolume()) < 0.0001
+            if (sameCounts) {
+                showToast("Mã kiện " + bundleCode + " đã gửi rồi", "warning")
+                return
+            }
+            // Khác số liệu → hỏi update
+            if (!confirm("Mã kiện " + bundleCode + " đã tồn tại (" + ex.board_count + " tấm, " + parseFloat(ex.volume).toFixed(4) + " m³).\n\nCập nhật số liệu mới (" + boards.length + " tấm, " + calcVolume().toFixed(4) + " m³)?")) {
+                return
+            }
+            // Update record cũ thay vì tạo mới
+            await sb.from("bundle_measurements").update({
+                wood_type: woodType.value.trim(),
+                wood_id: selectedWoodId || null,
+                thickness: parseFloat(thickness.value) || 0,
+                quality: quality.value.trim(),
+                boards: boards,
+                board_count: boards.length,
+                volume: calcVolume(),
+                measured_by: currentUser,
+                measurement_type: currentMeasurementType,
+                updated_at: new Date().toISOString()
+            }).eq("id", ex.id)
+            showToast("Đã cập nhật kiện " + bundleCode + " ✓", "success")
+            return
+        }
+        // Upsert bình thường
         await sb.from("bundle_measurements").upsert({
             session_id: currentSessionId,
-            bundle_code: bundle.value.trim(),
+            bundle_code: bundleCode,
             wood_type: woodType.value.trim(),
+            wood_id: selectedWoodId || null,
             thickness: parseFloat(thickness.value) || 0,
             quality: quality.value.trim(),
             boards: boards,
@@ -266,7 +364,11 @@ async function lookupBundle() {
             let attrs = data.attributes || {}
             let thick = attrs.thickness || ""
             let qual = attrs.quality || ""
-            if (wName) woodType.value = wName.toUpperCase()
+            if (wName) {
+                woodType.value = wName.toUpperCase()
+                selectedWoodId = data.wood_id || ""
+                renderWoodTypeDropdown()
+            }
             if (thick) {
                 /* Thickness lưu dạng "2F" — lấy số trước ký tự F */
                 let match = thick.match(/^([\d.]+)/)
@@ -296,6 +398,8 @@ let widMax = 35
 let woodUS = false
 let currentSessionId = null
 const MAX_SAVED_LISTS = 15
+let woodTypeList = [] // [{id, name}] từ DB
+let selectedWoodId = "" // wood_id đã chọn
 
 /* LOCAL STORAGE */
 function saveState() {
@@ -313,7 +417,8 @@ function saveState() {
         thickness: thickness.value,
         quality: quality.value,
         sessionId: currentSessionId,
-        measurementType: currentMeasurementType
+        measurementType: currentMeasurementType,
+        woodId: selectedWoodId
     }
     localStorage.setItem("woodMeasureState", JSON.stringify(state))
     /* Realtime sync vào saved lists */
@@ -353,6 +458,10 @@ function loadState() {
         if (state.measurementType) {
             currentMeasurementType = state.measurementType
             updateMeasurementTypeUI()
+        }
+        if (state.woodId) {
+            selectedWoodId = state.woodId
+            renderWoodTypeDropdown()
         }
     } catch (e) { }
 }
@@ -878,8 +987,10 @@ function resetBoards() {
     widthGrid.classList.add("disabled")
     bundle.value = ""
     woodType.value = ""
+    selectedWoodId = ""
     thickness.value = ""
     quality.value = ""
+    renderWoodTypeDropdown()
     updateSummary()
     renderList()
     saveState()
@@ -1030,6 +1141,7 @@ async function shareMatrixZalo() {
 /* LOAD */
 window.addEventListener("load", async function () {
     await verifySavedAccess()
+    loadWoodTypes()
     accessInput.addEventListener("keypress", function (e) {
         if (e.key === "Enter") {
             checkAccessCode()
