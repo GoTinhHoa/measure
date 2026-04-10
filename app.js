@@ -248,46 +248,13 @@ function calcVolume() {
 
 async function syncToSystem() {
     if (!currentUser || !currentSessionId || boards.length === 0) return
-    let bundleCode = bundle.value.trim()
     try {
-        // Chống trùng: kiểm tra mã kiện đã tồn tại ở session khác chưa
-        let { data: existing } = await sb.from("bundle_measurements")
-            .select("id, session_id, board_count, volume")
-            .eq("bundle_code", bundleCode)
-            .eq("deleted", false)
-            .neq("session_id", currentSessionId)
-            .eq("status", "chờ gán")
-        if (existing && existing.length > 0) {
-            let ex = existing[0]
-            let sameCounts = ex.board_count === boards.length && Math.abs(parseFloat(ex.volume) - calcVolume()) < 0.0001
-            if (sameCounts) {
-                showToast("Mã kiện " + bundleCode + " đã gửi rồi", "warning")
-                return
-            }
-            // Khác số liệu → hỏi update
-            if (!confirm("Mã kiện " + bundleCode + " đã tồn tại (" + ex.board_count + " tấm, " + parseFloat(ex.volume).toFixed(4) + " m³).\n\nCập nhật số liệu mới (" + boards.length + " tấm, " + calcVolume().toFixed(4) + " m³)?")) {
-                return
-            }
-            // Update record cũ thay vì tạo mới
-            await sb.from("bundle_measurements").update({
-                wood_type: woodType.value.trim(),
-                wood_id: selectedWoodId || null,
-                thickness: parseFloat(thickness.value) || 0,
-                quality: quality.value.trim(),
-                boards: boards,
-                board_count: boards.length,
-                volume: calcVolume(),
-                measured_by: currentUser,
-                measurement_type: currentMeasurementType,
-                updated_at: new Date().toISOString()
-            }).eq("id", ex.id)
-            showToast("Đã cập nhật kiện " + bundleCode + " ✓", "success")
-            return
-        }
-        // Upsert bình thường
+        // session_id unique per kiện (tạo 1 lần khi startMeasure, reset khi "Kiện mới")
+        // Cùng session chia sẻ lại → upsert update (cập nhật số tấm/khối lượng)
+        // Khác session cùng mã kiện → tạo record mới (soạn lẻ cho khách khác)
         await sb.from("bundle_measurements").upsert({
             session_id: currentSessionId,
-            bundle_code: bundleCode,
+            bundle_code: bundle.value.trim(),
             wood_type: woodType.value.trim(),
             wood_id: selectedWoodId || null,
             thickness: parseFloat(thickness.value) || 0,
