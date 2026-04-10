@@ -818,8 +818,8 @@ input:focus {
     min-height: 18px;
 }
 
-/* Wood type picker dropdown */
-.woodTypePicker {
+/* Wood type suggest dropdown */
+.woodSuggestList {
     display: none;
     position: absolute;
     top: 100%;
@@ -827,42 +827,28 @@ input:focus {
     right: 0;
     background: #FFF8F0;
     border: 2px solid #D4B896;
-    border-radius: 8px;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
     box-shadow: 0 8px 24px rgba(61,32,16,0.15);
     z-index: 100;
-    max-height: 260px;
-    overflow: hidden;
-    flex-direction: column;
-}
-.woodTypePicker.open {
-    display: flex;
-}
-.woodTypeSearch {
-    width: 100%;
-    padding: 10px 12px;
-    border: none;
-    border-bottom: 1px solid #E8D5C4;
-    font-size: 15px;
-    background: #fff;
-    outline: none;
-    box-sizing: border-box;
-}
-.woodTypePickerList {
+    max-height: 200px;
     overflow-y: auto;
-    flex: 1;
     -webkit-overflow-scrolling: touch;
 }
-.woodTypeItem {
+.woodSuggestList.open {
+    display: block;
+}
+.woodSuggestItem {
     padding: 10px 12px;
     font-size: 15px;
     cursor: pointer;
     border-bottom: 1px solid #F0E6DA;
     color: #3D2010;
 }
-.woodTypeItem:active {
+.woodSuggestItem:active {
     background: #E8D5C4;
 }
-.woodTypeItem.active {
+.woodSuggestItem.active {
     background: rgba(30,92,56,0.08);
     color: #1E5C38;
     font-weight: 700;

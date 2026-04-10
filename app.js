@@ -185,56 +185,57 @@ async function loadWoodTypes() {
 }
 
 function renderWoodTypeDropdown() {
-    let container = document.getElementById("woodTypePickerList")
-    if (!container) return
-    container.innerHTML = ""
-    woodTypeList.forEach(w => {
-        let item = document.createElement("div")
-        item.className = "woodTypeItem" + (selectedWoodId === w.id ? " active" : "")
-        item.innerText = w.name
-        item.onclick = function () { selectWoodType(w.id, w.name) }
-        container.appendChild(item)
-    })
+    // stub — suggest list updates on input/focus
 }
 
 function selectWoodType(id, name) {
     selectedWoodId = id
     woodType.value = name.toUpperCase()
-    document.getElementById("woodTypePicker").classList.remove("open")
-    renderWoodTypeDropdown()
+    hideWoodSuggest()
     saveState()
 }
 
-function openWoodTypePicker() {
-    let picker = document.getElementById("woodTypePicker")
-    picker.classList.add("open")
-    let searchInput = document.getElementById("woodTypeSearch")
-    searchInput.value = ""
-    filterWoodTypes("")
-    setTimeout(() => searchInput.focus(), 100)
+function showWoodSuggest() {
+    updateWoodSuggest(woodType.value)
 }
 
-function filterWoodTypes(query) {
-    let container = document.getElementById("woodTypePickerList")
+function onWoodTypeInput(val) {
+    selectedWoodId = "" // clear selection khi user gõ tay
+    updateWoodSuggest(val)
+}
+
+function updateWoodSuggest(query) {
+    let container = document.getElementById("woodSuggestList")
     if (!container) return
     container.innerHTML = ""
-    let q = query.toLowerCase().trim()
+    let q = (query || "").toLowerCase().trim()
     let filtered = q ? woodTypeList.filter(w => w.name.toLowerCase().includes(q) || w.id.toLowerCase().includes(q)) : woodTypeList
+    if (!filtered.length) {
+        container.classList.remove("open")
+        return
+    }
     filtered.forEach(w => {
         let item = document.createElement("div")
-        item.className = "woodTypeItem" + (selectedWoodId === w.id ? " active" : "")
+        item.className = "woodSuggestItem" + (selectedWoodId === w.id ? " active" : "")
         item.innerText = w.name
+        item.onmousedown = function (e) { e.preventDefault() } // prevent blur
         item.onclick = function () { selectWoodType(w.id, w.name) }
         container.appendChild(item)
     })
-    if (!filtered.length) {
-        let empty = document.createElement("div")
-        empty.className = "woodTypeItem"
-        empty.style.color = "#9A8878"
-        empty.innerText = "Không tìm thấy"
-        container.appendChild(empty)
-    }
+    container.classList.add("open")
 }
+
+function hideWoodSuggest() {
+    let container = document.getElementById("woodSuggestList")
+    if (container) container.classList.remove("open")
+}
+
+// Ẩn suggest khi blur (trừ khi click vào item)
+document.addEventListener("click", function (e) {
+    if (!e.target.closest("#woodType") && !e.target.closest("#woodSuggestList")) {
+        hideWoodSuggest()
+    }
+})
 
 /* SYNC lên hệ thống */
 function calcVolume() {
@@ -345,6 +346,7 @@ let lastLookupCode = ""
 async function lookupBundle() {
     let code = bundle.value.trim()
     if (!code || code === lastLookupCode) return
+    if (currentMeasurementType === "whole_bundle") return // kiện nguyên không cần lookup
     lastLookupCode = code
     let statusEl = document.getElementById("bundleLookupStatus")
     statusEl.innerHTML = "<span style='color:#9A8878'>Đang tìm...</span>"

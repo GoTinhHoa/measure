@@ -88,14 +88,9 @@
                 </div>
                 <div style="position:relative">
                     <label class="fieldLabel">Loại gỗ</label>
-                    <input id="woodType" readonly onclick="openWoodTypePicker()" placeholder="Chọn loại gỗ" style="cursor:pointer">
-                    <div id="woodTypePicker" class="woodTypePicker">
-                        <input id="woodTypeSearch" class="woodTypeSearch" placeholder="Tìm kiếm..." oninput="filterWoodTypes(this.value)">
-                        <div id="woodTypePickerList" class="woodTypePickerList"></div>
-                        <div style="padding:6px 8px;border-top:1px solid #E8D5C4">
-                            <button class="smallBtn" onclick="document.getElementById('woodTypePicker').classList.remove('open')" style="width:100%;font-size:12px">Đóng</button>
-                        </div>
-                    </div>
+                    <input id="woodType" placeholder="Chọn loại gỗ" autocomplete="off"
+                        onfocus="showWoodSuggest()" oninput="onWoodTypeInput(this.value)">
+                    <div id="woodSuggestList" class="woodSuggestList"></div>
                 </div>
                 <div>
                     <label class="fieldLabel">Độ dày (cm)</label>
