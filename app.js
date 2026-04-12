@@ -174,8 +174,17 @@ async function checkDeviceAccess(accessCode, fp, token) {
 }
 
 async function registerDeviceAccess(accessCode, fp, geo) {
+    // Kiểm tra xem device đã tồn tại chưa — nếu có thì KHÔNG ghi đè status
+    let { data: existing } = await sb.from("device_whitelist")
+        .select("id, device_token").eq("username", accessCode).eq("fingerprint", fp).maybeSingle()
+    if (existing) {
+        // Đã tồn tại → chỉ cập nhật geo/ua, không đổi status
+        fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_last_seen", id: existing.id, ip: geo?.ip, city: geo?.city, region: geo?.region, country: geo?.country, lat: geo?.lat, lon: geo?.lon }) }).catch(() => {})
+        return { success: true, device_token: existing.device_token }
+    }
+    // Chưa tồn tại → insert mới với status pending
     let insert = { username: accessCode, fingerprint: fp, user_agent: navigator.userAgent || "", ip_address: geo?.ip || "", city: geo?.city || "", region: geo?.region || "", country: geo?.country || "", lat: geo?.lat || null, lon: geo?.lon || null, status: "pending", app_source: "wood-measure" }
-    let { data, error } = await sb.from("device_whitelist").upsert(insert, { onConflict: "username,fingerprint" }).select("device_token").single()
+    let { data, error } = await sb.from("device_whitelist").insert(insert).select("device_token").single()
     if (error) return { error: error.message }
     return { success: true, device_token: data?.device_token }
 }
@@ -187,44 +196,64 @@ async function fetchDeviceRestrictionEnabled() {
 
 function showDeviceStatus(type) {
     let el = document.getElementById("deviceStatusMsg")
+    let formEls = document.querySelectorAll("#accessInput, #accessBtn, .accessDesc")
     if (!el) return
-    if (type === "pending") {
+    if (type === "pending" || type === "blocked") {
+        formEls.forEach(e => e.style.display = "none")
         el.style.display = "block"
-        el.style.background = "#FEF3C7"
-        el.style.border = "1px solid #F59E0B"
-        el.style.color = "#92400E"
-        el.innerHTML = "<b>Thiết bị chưa được phê duyệt</b><br>Thiết bị đã được ghi nhận, đang chờ quản trị viên phê duyệt."
-    } else if (type === "blocked") {
-        el.style.display = "block"
-        el.style.background = "#FEE2E2"
-        el.style.border = "1px solid #EF4444"
-        el.style.color = "#991B1B"
-        el.innerHTML = "<b>Thiết bị đã bị chặn</b><br>Thiết bị không được phép truy cập. Liên hệ quản trị viên."
+        if (type === "pending") {
+            el.style.background = "#FEF3C7"
+            el.style.border = "1px solid #F59E0B"
+            el.style.color = "#92400E"
+            el.innerHTML = "<b>Thiết bị chưa được phê duyệt</b><br>Thiết bị đã được ghi nhận, đang chờ quản trị viên phê duyệt.<br><button onclick='retryDeviceCheck()' style='margin-top:10px;padding:8px 20px;border-radius:8px;border:none;background:#D97706;color:#fff;font-weight:700;font-size:0.82rem;cursor:pointer'>Thử lại</button>"
+        } else {
+            el.style.background = "#FEE2E2"
+            el.style.border = "1px solid #EF4444"
+            el.style.color = "#991B1B"
+            el.innerHTML = "<b>Thiết bị đã bị chặn</b><br>Thiết bị không được phép truy cập. Liên hệ quản trị viên.<br><button onclick='retryDeviceCheck()' style='margin-top:10px;padding:8px 20px;border-radius:8px;border:none;background:#991B1B;color:#fff;font-weight:700;font-size:0.82rem;cursor:pointer'>Thử lại</button>"
+        }
     } else {
         el.style.display = "none"
+        formEls.forEach(e => e.style.display = "")
     }
+}
+function retryDeviceCheck() {
+    showDeviceStatus(null)
+    document.getElementById("accessLoading").innerText = "Đang kiểm tra thiết bị..."
+    verifySavedAccess().finally(() => {
+        document.getElementById("accessLoading").innerText = ""
+    })
 }
 
 /** Xử lý device check chung — trả về true nếu cho vào app */
 async function handleDeviceCheck(accessCode, showBlockUI) {
+    // Bước 1: kiểm tra restriction
+    let restrictionOn = false
+    try {
+        restrictionOn = await Promise.race([fetchDeviceRestrictionEnabled(), new Promise((_, rej) => setTimeout(() => rej(), 3000))])
+    } catch {}
+
+    if (!restrictionOn) {
+        // Thu thập — không chặn
+        getDeviceFingerprint().then(fp => {
+            if (fp) getIpGeoLocation().then(geo => registerDeviceAccess(accessCode, fp, geo).then(r => { if (r.device_token) saveDeviceToken(r.device_token) })).catch(() => {})
+        }).catch(() => {})
+        return true
+    }
+
+    // Bước 2: Restriction ON — phải check device, mọi lỗi đều chặn
     try {
         let [fp, geo] = await Promise.all([
             getDeviceFingerprint().catch(() => null),
             getIpGeoLocation().catch(() => ({ ip: "" })),
         ])
         let token = getDeviceToken()
-        let restrictionOn = false
-        try { restrictionOn = await Promise.race([fetchDeviceRestrictionEnabled(), new Promise((_, rej) => setTimeout(() => rej(), 3000))]) } catch {}
 
-        if (!fp) return true // graceful degradation
-
-        if (!restrictionOn) {
-            // Thu thập — không chặn
-            registerDeviceAccess(accessCode, fp, geo).then(r => { if (r.device_token) saveDeviceToken(r.device_token) }).catch(() => {})
-            return true
+        if (!fp) {
+            if (showBlockUI) showDeviceStatus("pending")
+            return false
         }
 
-        // Restriction ON — check device
         let result
         try {
             result = await Promise.race([checkDeviceAccess(accessCode, fp, token), new Promise((_, rej) => setTimeout(() => rej("timeout"), 3000))])
@@ -233,13 +262,14 @@ async function handleDeviceCheck(accessCode, showBlockUI) {
             let cache = getCachedDeviceStatus()
             if (cache && cache.status === "blocked") { if (showBlockUI) showDeviceStatus("blocked"); return false }
             if (isDeviceCacheValid(cache) && cache.status === "approved") return true
-            return true // cache hết hạn hoặc không có → cho vào
+            // Không có cache hợp lệ + offline → chặn
+            if (showBlockUI) showDeviceStatus("pending")
+            return false
         }
 
         if (result.status === "approved") {
             if (result.device_token) saveDeviceToken(result.device_token)
             saveCachedDeviceStatus("approved", result.id)
-            // Update last seen qua Edge Function
             fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_last_seen", id: result.id, ip: geo.ip, city: geo.city, region: geo.region, country: geo.country, lat: geo.lat, lon: geo.lon }) }).catch(() => {})
             return true
         }
@@ -253,14 +283,16 @@ async function handleDeviceCheck(accessCode, showBlockUI) {
             if (showBlockUI) showDeviceStatus("blocked")
             return false
         }
-        // unknown → register
+        // unknown → register (không ghi đè status nếu đã tồn tại)
         let reg = await registerDeviceAccess(accessCode, fp, geo)
         if (reg.device_token) saveDeviceToken(reg.device_token)
         saveCachedDeviceStatus("pending", null)
         if (showBlockUI) showDeviceStatus("pending")
-        return false // restriction ON + mới register = pending
+        return false
     } catch {
-        return true // lỗi → cho vào (graceful)
+        // Restriction ON + bất kỳ lỗi nào → chặn
+        if (showBlockUI) showDeviceStatus("pending")
+        return false
     }
 }
 
@@ -343,8 +375,9 @@ async function verifySavedAccess() {
         }
         // Access OK → device check
         let deviceOk = await handleDeviceCheck(saved.code, true)
-        if (!deviceOk) {
-            // Hiện access screen với device status message
+        if (deviceOk) {
+            document.getElementById("accessScreen").style.display = "none"
+        } else {
             document.getElementById("accessScreen").style.display = "flex"
         }
     } catch (e) {
