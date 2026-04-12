@@ -35,6 +35,7 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="https://openfpcdn.io/fingerprintjs/v4/iife.min.js"></script>
 </head>
 
 <body>
@@ -69,6 +70,7 @@
             <button id="accessBtn" class="accessBtn" onclick="checkAccessCode()">Xác nhận</button>
             <div id="accessLoading" class="accessLoading"></div>
             <div id="accessError" class="accessError"></div>
+            <div id="deviceStatusMsg" style="display:none;margin-top:12px;padding:10px 12px;border-radius:8px;font-size:0.82rem;line-height:1.5"></div>
         </div>
         </div>
     </div>

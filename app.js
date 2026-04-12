@@ -105,6 +105,165 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 let currentUser = ""
 let currentMeasurementType = "order_split" // 'order_split' | 'whole_bundle'
 
+/* ===== DEVICE WHITELIST ===== */
+const DEVICE_TOKEN_KEY = "wood_device_token"
+const DEVICE_STATUS_KEY = "wood_device_status"
+const DEVICE_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000 // 7 ngày
+const DEVICE_FN_URL = SUPABASE_URL + "/functions/v1/device-manage"
+const DEVICE_SECRET = "gth-device-secret-2026"
+
+let cachedFp = null
+
+async function getDeviceFingerprint() {
+    if (cachedFp) return cachedFp
+    try {
+        const fp = await FingerprintJS.load()
+        const result = await fp.get()
+        cachedFp = result.visitorId
+        return cachedFp
+    } catch { return null }
+}
+
+function getDeviceToken() { try { return localStorage.getItem(DEVICE_TOKEN_KEY) } catch { return null } }
+function saveDeviceToken(t) { try { localStorage.setItem(DEVICE_TOKEN_KEY, t) } catch {} }
+
+function getCachedDeviceStatus() {
+    try { return JSON.parse(localStorage.getItem(DEVICE_STATUS_KEY)) } catch { return null }
+}
+function saveCachedDeviceStatus(status, deviceId) {
+    try { localStorage.setItem(DEVICE_STATUS_KEY, JSON.stringify({ status, deviceId, checkedAt: Date.now() })) } catch {}
+}
+function isDeviceCacheValid(cache) {
+    return cache && cache.checkedAt && (Date.now() - cache.checkedAt < DEVICE_CACHE_MAX_AGE)
+}
+
+async function getIpGeoLocation() {
+    try {
+        let res = await fetch("http://ip-api.com/json/?fields=query,city,regionName,country,lat,lon", { signal: AbortSignal.timeout(5000) })
+        let j = await res.json()
+        return { ip: j.query || "", city: j.city || "", region: j.regionName || "", country: j.country || "", lat: j.lat || null, lon: j.lon || null }
+    } catch {
+        try {
+            let res = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(3000) })
+            let j = await res.json()
+            return { ip: j.ip || "", city: "", region: "", country: "", lat: null, lon: null }
+        } catch { return { ip: "", city: "", region: "", country: "", lat: null, lon: null } }
+    }
+}
+
+async function checkDeviceAccess(accessCode, fp, token) {
+    // Ưu tiên token
+    if (token) {
+        let { data } = await sb.from("device_whitelist")
+            .select("id, status, device_token, fingerprint")
+            .eq("username", accessCode).eq("device_token", token).maybeSingle()
+        if (data) {
+            if (fp && data.fingerprint !== fp) {
+                fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_fingerprint", id: data.id, fingerprint: fp }) }).catch(() => {})
+            }
+            return { status: data.status, id: data.id, device_token: data.device_token }
+        }
+    }
+    // Fallback fingerprint
+    let { data, error } = await sb.from("device_whitelist")
+        .select("id, status, device_token")
+        .eq("username", accessCode).eq("fingerprint", fp).maybeSingle()
+    if (error) return { status: "error" }
+    if (!data) return { status: "unknown" }
+    return { status: data.status, id: data.id, device_token: data.device_token }
+}
+
+async function registerDeviceAccess(accessCode, fp, geo) {
+    let insert = { username: accessCode, fingerprint: fp, user_agent: navigator.userAgent || "", ip_address: geo?.ip || "", city: geo?.city || "", region: geo?.region || "", country: geo?.country || "", lat: geo?.lat || null, lon: geo?.lon || null, status: "pending", app_source: "wood-measure" }
+    let { data, error } = await sb.from("device_whitelist").upsert(insert, { onConflict: "username,fingerprint" }).select("device_token").single()
+    if (error) return { error: error.message }
+    return { success: true, device_token: data?.device_token }
+}
+
+async function fetchDeviceRestrictionEnabled() {
+    let { data } = await sb.from("device_settings").select("value").eq("key", "restriction_wood_measure").maybeSingle()
+    return data?.value === true || data?.value === "true"
+}
+
+function showDeviceStatus(type) {
+    let el = document.getElementById("deviceStatusMsg")
+    if (!el) return
+    if (type === "pending") {
+        el.style.display = "block"
+        el.style.background = "#FEF3C7"
+        el.style.border = "1px solid #F59E0B"
+        el.style.color = "#92400E"
+        el.innerHTML = "<b>Thiết bị chưa được phê duyệt</b><br>Thiết bị đã được ghi nhận, đang chờ quản trị viên phê duyệt."
+    } else if (type === "blocked") {
+        el.style.display = "block"
+        el.style.background = "#FEE2E2"
+        el.style.border = "1px solid #EF4444"
+        el.style.color = "#991B1B"
+        el.innerHTML = "<b>Thiết bị đã bị chặn</b><br>Thiết bị không được phép truy cập. Liên hệ quản trị viên."
+    } else {
+        el.style.display = "none"
+    }
+}
+
+/** Xử lý device check chung — trả về true nếu cho vào app */
+async function handleDeviceCheck(accessCode, showBlockUI) {
+    try {
+        let [fp, geo] = await Promise.all([
+            getDeviceFingerprint().catch(() => null),
+            getIpGeoLocation().catch(() => ({ ip: "" })),
+        ])
+        let token = getDeviceToken()
+        let restrictionOn = false
+        try { restrictionOn = await Promise.race([fetchDeviceRestrictionEnabled(), new Promise((_, rej) => setTimeout(() => rej(), 3000))]) } catch {}
+
+        if (!fp) return true // graceful degradation
+
+        if (!restrictionOn) {
+            // Thu thập — không chặn
+            registerDeviceAccess(accessCode, fp, geo).then(r => { if (r.device_token) saveDeviceToken(r.device_token) }).catch(() => {})
+            return true
+        }
+
+        // Restriction ON — check device
+        let result
+        try {
+            result = await Promise.race([checkDeviceAccess(accessCode, fp, token), new Promise((_, rej) => setTimeout(() => rej("timeout"), 3000))])
+        } catch {
+            // Offline / timeout — dùng cache
+            let cache = getCachedDeviceStatus()
+            if (cache && cache.status === "blocked") { if (showBlockUI) showDeviceStatus("blocked"); return false }
+            if (isDeviceCacheValid(cache) && cache.status === "approved") return true
+            return true // cache hết hạn hoặc không có → cho vào
+        }
+
+        if (result.status === "approved") {
+            if (result.device_token) saveDeviceToken(result.device_token)
+            saveCachedDeviceStatus("approved", result.id)
+            // Update last seen qua Edge Function
+            fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_last_seen", id: result.id, ip: geo.ip, city: geo.city, region: geo.region, country: geo.country, lat: geo.lat, lon: geo.lon }) }).catch(() => {})
+            return true
+        }
+        if (result.status === "pending") {
+            saveCachedDeviceStatus("pending", result.id)
+            if (showBlockUI) showDeviceStatus("pending")
+            return false
+        }
+        if (result.status === "blocked") {
+            saveCachedDeviceStatus("blocked", result.id)
+            if (showBlockUI) showDeviceStatus("blocked")
+            return false
+        }
+        // unknown → register
+        let reg = await registerDeviceAccess(accessCode, fp, geo)
+        if (reg.device_token) saveDeviceToken(reg.device_token)
+        saveCachedDeviceStatus("pending", null)
+        if (showBlockUI) showDeviceStatus("pending")
+        return false // restriction ON + mới register = pending
+    } catch {
+        return true // lỗi → cho vào (graceful)
+    }
+}
+
 /* ACCESS — v2: dùng Supabase thay device.json */
 const ACCESS_KEY = "woodAccessCode_v2"
 
@@ -139,19 +298,25 @@ async function checkAccessCode() {
     btn.disabled = true
     loading.innerText = "Đang kiểm tra..."
     error.innerText = ""
+    showDeviceStatus(null)
     let ok = await validateAccessCode(code)
+    if (!ok) {
+        btn.disabled = false
+        loading.innerText = ""
+        error.innerText = "Mã không hợp lệ"
+        if (navigator.vibrate) navigator.vibrate(200)
+        input.focus()
+        return
+    }
+    // Access code OK → device check
+    let deviceOk = await handleDeviceCheck(code.toLowerCase().trim(), true)
     btn.disabled = false
     loading.innerText = ""
-    if (ok) {
+    if (deviceOk) {
         localStorage.setItem(ACCESS_KEY, JSON.stringify({ code: code.toLowerCase().trim(), user: currentUser, defaultType: currentMeasurementType }))
         document.getElementById("accessScreen").style.display = "none"
-    } else {
-        error.innerText = "Mã không hợp lệ"
-        if (navigator.vibrate) {
-            navigator.vibrate(200)
-        }
-        input.focus()
     }
+    // Nếu !deviceOk → showDeviceStatus đã hiện thông báo
 }
 async function verifySavedAccess() {
     let raw = localStorage.getItem(ACCESS_KEY)
@@ -162,11 +327,25 @@ async function verifySavedAccess() {
     }
     try {
         let saved = JSON.parse(raw)
-        let ok = await validateAccessCode(saved.code)
+        // Thử validate access code (cần internet)
+        let ok = false
+        try { ok = await Promise.race([validateAccessCode(saved.code), new Promise((_, rej) => setTimeout(() => rej("timeout"), 3000))]) } catch {
+            // Offline → dùng saved code trực tiếp
+            currentUser = saved.user || ""
+            currentMeasurementType = saved.defaultType || "order_split"
+            ok = true
+        }
         if (!ok) {
             localStorage.removeItem(ACCESS_KEY)
             document.getElementById("accessScreen").style.display = "flex"
             setTimeout(() => accessInput.focus(), 200)
+            return
+        }
+        // Access OK → device check
+        let deviceOk = await handleDeviceCheck(saved.code, true)
+        if (!deviceOk) {
+            // Hiện access screen với device status message
+            document.getElementById("accessScreen").style.display = "flex"
         }
     } catch (e) {
         localStorage.removeItem(ACCESS_KEY)
