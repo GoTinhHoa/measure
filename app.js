@@ -545,11 +545,13 @@ async function lookupBundle() {
     let statusEl = document.getElementById("bundleLookupStatus")
     statusEl.innerHTML = "<span style='color:#9A8878'>Đang tìm...</span>"
     try {
-        let { data } = await sb.from("wood_bundles")
-            .select("supplier_bundle_code, wood_id, attributes")
-            .or("supplier_bundle_code.eq." + code + ",supplier_bundle_code.ilike." + code)
+        /* Tìm theo bundle_code */
+        let { data, error: e1 } = await sb.from("wood_bundles")
+            .select("bundle_code, wood_id, attributes")
+            .eq("bundle_code", code)
             .limit(1)
-            .single()
+            .maybeSingle()
+        if (e1) console.log("lookup err:", e1.message)
         if (data) {
             /* Lấy tên gỗ tiếng Việt từ wood_types */
             let wName = data.wood_id || ""
