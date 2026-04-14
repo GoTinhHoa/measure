@@ -174,15 +174,30 @@ async function checkDeviceAccess(accessCode, fp, token) {
 }
 
 async function registerDeviceAccess(accessCode, fp, geo) {
-    // Kiểm tra xem device đã tồn tại chưa — nếu có thì KHÔNG ghi đè status
-    let { data: existing } = await sb.from("device_whitelist")
-        .select("id, device_token").eq("username", accessCode).eq("fingerprint", fp).maybeSingle()
-    if (existing) {
-        // Đã tồn tại → chỉ cập nhật geo/ua, không đổi status
-        fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_last_seen", id: existing.id, ip: geo?.ip, city: geo?.city, region: geo?.region, country: geo?.country, lat: geo?.lat, lon: geo?.lon }) }).catch(() => {})
-        return { success: true, device_token: existing.device_token }
+    let token = getDeviceToken()
+    // Ưu tiên 1: tìm bằng device_token (ổn định hơn fingerprint)
+    if (token) {
+        let { data: byToken } = await sb.from("device_whitelist")
+            .select("id, device_token, fingerprint").eq("username", accessCode).eq("device_token", token).maybeSingle()
+        if (byToken) {
+            // Cùng thiết bị — cập nhật fingerprint mới + geo, không tạo dòng mới
+            let updates = { action: "update_last_seen", id: byToken.id, ip: geo?.ip, city: geo?.city, region: geo?.region, country: geo?.country, lat: geo?.lat, lon: geo?.lon }
+            if (fp && byToken.fingerprint !== fp) updates.action = "update_fingerprint_and_seen"
+            fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify(fp && byToken.fingerprint !== fp ? { action: "update_fingerprint", id: byToken.id, fingerprint: fp } : updates) }).catch(() => {})
+            if (fp && byToken.fingerprint !== fp) {
+                fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_last_seen", id: byToken.id, ip: geo?.ip, city: geo?.city, region: geo?.region, country: geo?.country, lat: geo?.lat, lon: geo?.lon }) }).catch(() => {})
+            }
+            return { success: true, device_token: byToken.device_token }
+        }
     }
-    // Chưa tồn tại → insert mới với status pending
+    // Ưu tiên 2: tìm bằng fingerprint
+    let { data: byFp } = await sb.from("device_whitelist")
+        .select("id, device_token").eq("username", accessCode).eq("fingerprint", fp).maybeSingle()
+    if (byFp) {
+        fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_last_seen", id: byFp.id, ip: geo?.ip, city: geo?.city, region: geo?.region, country: geo?.country, lat: geo?.lat, lon: geo?.lon }) }).catch(() => {})
+        return { success: true, device_token: byFp.device_token }
+    }
+    // Không tìm thấy → insert mới
     let insert = { username: accessCode, fingerprint: fp, user_agent: navigator.userAgent || "", ip_address: geo?.ip || "", city: geo?.city || "", region: geo?.region || "", country: geo?.country || "", lat: geo?.lat || null, lon: geo?.lon || null, status: "pending", app_source: "wood-measure" }
     let { data, error } = await sb.from("device_whitelist").insert(insert).select("device_token").single()
     if (error) return { error: error.message }
