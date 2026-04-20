@@ -491,6 +491,7 @@ async function syncToSystem() {
             volume: calcVolume(),
             measured_by: currentUser,
             measurement_type: currentMeasurementType,
+            bundle_check: document.getElementById("bundleStatus").value || "-",
             status: "chờ gán",
             deleted: false,
             updated_at: new Date().toISOString()
@@ -616,7 +617,8 @@ function saveState() {
         quality: quality.value,
         sessionId: currentSessionId,
         measurementType: currentMeasurementType,
-        woodId: selectedWoodId
+        woodId: selectedWoodId,
+        bundleStatus: document.getElementById("bundleStatus")?.value || "-"
     }
     localStorage.setItem("woodMeasureState", JSON.stringify(state))
     /* Realtime sync vào saved lists */
@@ -660,6 +662,10 @@ function loadState() {
         if (state.woodId) {
             selectedWoodId = state.woodId
             renderWoodTypeDropdown()
+        }
+        if (state.bundleStatus) {
+            let sel = document.getElementById("bundleStatus")
+            if (sel) sel.value = state.bundleStatus
         }
     } catch (e) { }
 }
@@ -1171,6 +1177,8 @@ function resetBoards() {
     selectedWoodId = ""
     thickness.value = ""
     quality.value = ""
+    let bsSel = document.getElementById("bundleStatus")
+    if (bsSel) bsSel.value = "-"
     renderWoodTypeDropdown()
     updateSummary()
     renderList()
