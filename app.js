@@ -1282,34 +1282,42 @@ async function shareMatrixZalo() {
         }
         /* html2canvas không render <select> — tạm thay bằng <span> */
         let sel = document.getElementById("bundleStatus")
+        // Xóa span cũ nếu còn sót từ lần trước (phòng trùng lặp)
+        let oldSpans = sel.parentNode.querySelectorAll(".bundleStatus-text")
+        oldSpans.forEach(s => s.remove())
         let tempSpan = document.createElement("span")
         tempSpan.innerText = sel.value
         tempSpan.className = "bundleStatus-text"
         sel.style.display = "none"
         sel.parentNode.insertBefore(tempSpan, sel.nextSibling)
 
-        let canvas = await html2canvas(el, {
-            scale: 3,
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: el.scrollWidth,
-            windowHeight: el.scrollHeight
-        })
+        let canvas
+        try {
+            canvas = await html2canvas(el, {
+                scale: 3,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: el.scrollWidth,
+                windowHeight: el.scrollHeight
+            })
+        } finally {
+            /* Luôn khôi phục — dù html2canvas thành công hay lỗi */
+            tempSpan.remove()
+            sel.style.display = ""
+            el.style.removeProperty("width")
+            if (table) table.style.transform = oldTransform
+        }
 
-        /* Khôi phục select */
-        tempSpan.remove()
-        sel.style.display = ""
-        el.style.removeProperty("width")
-        if (table) table.style.transform = oldTransform
         canvas.toBlob(async function (blob) {
             let file = new File([blob], "matrix.png", { type: "image/png" })
             if (navigator.share) {
-                await navigator.share({
-                    files: [file],
-                    title: ""
-                })
-                showToast("Chia sẻ thành công", "success")
-                syncToSystem()
+                try {
+                    await navigator.share({ files: [file], title: "" })
+                    showToast("Chia sẻ thành công", "success")
+                    syncToSystem()
+                } catch (shareErr) {
+                    /* User cancel share dialog — không báo lỗi */
+                }
             } else {
                 showToast("Thiết bị không hỗ trợ chia sẻ", "warning")
             }
