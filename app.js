@@ -810,23 +810,6 @@ function confirmDeleteSession(id) {
     })
 }
 
-/* RESET */
-function confirmResetSetting() {
-    showConfirm("Reset cấu hình", "Toàn bộ tấm đã nhập và cấu hình kiện sẽ bị xóa.", resetSetting)
-}
-function resetSetting() {
-    bundle.value = ""
-    woodType.value = ""
-    quality.value = ""
-    thickness.value = ""
-    boards = []
-    document.getElementById("woodUS").checked = false
-    woodUS = false
-    updateSummary()
-    renderList()
-    saveState()
-}
-
 /* NAV */
 function go(screen) {
     document.querySelectorAll(".screen").forEach(s => {

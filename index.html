@@ -14,7 +14,7 @@
     <script>
         /* Force update khi phiên bản cũ — chạy trước mọi thứ */
         (function () {
-            var APP_VERSION = "4.1";
+            var APP_VERSION = "4.2";
             var stored = localStorage.getItem("appVersion");
             if (stored !== APP_VERSION) {
                 localStorage.setItem("appVersion", APP_VERSION);
@@ -130,7 +130,6 @@
         <div style="display:flex; justify-content:space-between; margin-top:4px;">
             <button onclick="startMeasure()">Bắt đầu nhập</button>
             <button class="smallBtn" onclick="showSavedLists()">Lịch sử</button>
-            <button class="smallBtn" onclick="confirmResetSetting()">Reset</button>
         </div>
 
         <!-- SAVED LISTS PANEL -->
