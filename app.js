@@ -509,11 +509,17 @@ function updateMeasurementTypeUI() {
     let labelSL = document.querySelector("#measureTypeCheck")?.parentElement?.nextElementSibling
     if (!chk) return
     let isWhole = currentMeasurementType === "whole_bundle"
-    chk.checked = !isWhole // checked = soạn lẻ (right side), unchecked = nguyên kiện (left side)
+    chk.checked = !isWhole
     if (labelNK) labelNK.style.color = isWhole ? "#3D2010" : "#9A8878"
     if (labelNK) labelNK.style.fontWeight = isWhole ? "700" : "500"
     if (labelSL) labelSL.style.color = !isWhole ? "#3D2010" : "#9A8878"
     if (labelSL) labelSL.style.fontWeight = !isWhole ? "700" : "500"
+    // Ẩn/hiện dropdown tình trạng kiện: chỉ hiện khi soạn lẻ
+    let bs = document.getElementById("bundleStatus")
+    if (bs) {
+        bs.style.display = isWhole ? "none" : ""
+        if (isWhole) bs.value = "-"
+    }
 }
 function onMeasureTypeToggle() {
     let chk = document.getElementById("measureTypeCheck")
@@ -1278,6 +1284,20 @@ function renderExcelMatrix() {
 
 /* SHARE */
 async function shareMatrixZalo() {
+    // Kiện lẻ: bắt buộc chọn tình trạng thực tế trước khi chia sẻ
+    if (currentMeasurementType === "order_split") {
+        let bs = document.getElementById("bundleStatus")
+        if (bs && bs.value === "-") {
+            let t = document.getElementById("toast")
+            t.innerText = "Phải chọn tình trạng kiện trước (Kiện lẻ/Lẻ hết)"
+            t.className = "toast warning"
+            t.style.display = "block"
+            setTimeout(() => { t.style.display = "none" }, 4000)
+            bs.focus()
+            if (navigator.vibrate) navigator.vibrate(200)
+            return
+        }
+    }
     try {
         let el = document.getElementById("matrixCaptureArea")
         let table = el.querySelector("table")
