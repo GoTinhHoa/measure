@@ -105,106 +105,59 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 let currentUser = ""
 let currentMeasurementType = "order_split" // 'order_split' | 'whole_bundle'
 
-/* ===== DEVICE WHITELIST ===== */
-const DEVICE_TOKEN_KEY = "wood_device_token"
-const DEVICE_STATUS_KEY = "wood_device_status"
+/* ===== DEVICE CODE — mã thiết bị do admin quản lý ===== */
+const DEVICE_CODE_KEY = "wood_device_code_hash"
+const DEVICE_CACHE_KEY = "wood_device_cache"
 const DEVICE_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000 // 7 ngày
 const DEVICE_FN_URL = SUPABASE_URL + "/functions/v1/device-manage"
 const DEVICE_SECRET = "gth-device-secret-2026"
 
-let cachedFp = null
+async function sha256(text) {
+    let data = new TextEncoder().encode(text)
+    let buf = await crypto.subtle.digest("SHA-256", data)
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("")
+}
 
-async function getDeviceFingerprint() {
-    if (cachedFp) return cachedFp
+function getDeviceCodeHash() { try { return localStorage.getItem(DEVICE_CODE_KEY) } catch { return null } }
+function saveDeviceCodeHash(h) { try { localStorage.setItem(DEVICE_CODE_KEY, h) } catch {} }
+
+function getCachedDevice() { try { return JSON.parse(localStorage.getItem(DEVICE_CACHE_KEY)) } catch { return null } }
+function saveCachedDevice(status, id) { try { localStorage.setItem(DEVICE_CACHE_KEY, JSON.stringify({ status, id, checkedAt: Date.now() })) } catch {} }
+function isCacheValid(c) { return c && c.checkedAt && (Date.now() - c.checkedAt < DEVICE_CACHE_MAX_AGE) }
+
+async function getGeo() {
     try {
-        const fp = await FingerprintJS.load()
-        const result = await fp.get()
-        cachedFp = result.visitorId
-        return cachedFp
-    } catch { return null }
+        let r = await fetch("http://ip-api.com/json/?fields=query,city,regionName,country", { signal: AbortSignal.timeout(3000) })
+        let j = await r.json()
+        return { ip: j.query || "", city: j.city || "", region: j.regionName || "", country: j.country || "" }
+    } catch { return { ip: "", city: "", region: "", country: "" } }
 }
 
-function getDeviceToken() { try { return localStorage.getItem(DEVICE_TOKEN_KEY) } catch { return null } }
-function saveDeviceToken(t) { try { localStorage.setItem(DEVICE_TOKEN_KEY, t) } catch {} }
-
-function getCachedDeviceStatus() {
-    try { return JSON.parse(localStorage.getItem(DEVICE_STATUS_KEY)) } catch { return null }
-}
-function saveCachedDeviceStatus(status, deviceId) {
-    try { localStorage.setItem(DEVICE_STATUS_KEY, JSON.stringify({ status, deviceId, checkedAt: Date.now() })) } catch {}
-}
-function isDeviceCacheValid(cache) {
-    return cache && cache.checkedAt && (Date.now() - cache.checkedAt < DEVICE_CACHE_MAX_AGE)
+async function verifyDeviceCode(codeHash) {
+    let { data } = await sb.from("device_codes")
+        .select("id, status").eq("code_hash", codeHash).eq("app_source", "wood-measure").maybeSingle()
+    if (!data) return { status: "invalid" }
+    return { status: data.status, id: data.id }
 }
 
-async function getIpGeoLocation() {
-    try {
-        let res = await fetch("http://ip-api.com/json/?fields=query,city,regionName,country,lat,lon", { signal: AbortSignal.timeout(5000) })
-        let j = await res.json()
-        return { ip: j.query || "", city: j.city || "", region: j.regionName || "", country: j.country || "", lat: j.lat || null, lon: j.lon || null }
-    } catch {
-        try {
-            let res = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(3000) })
-            let j = await res.json()
-            return { ip: j.ip || "", city: "", region: "", country: "", lat: null, lon: null }
-        } catch { return { ip: "", city: "", region: "", country: "", lat: null, lon: null } }
-    }
+async function activateDeviceCode(codeHash) {
+    let res = await fetch(DEVICE_FN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET },
+        body: JSON.stringify({ action: "activate_code", codeHash, appSource: "wood-measure", deviceInfo: { user_agent: navigator.userAgent }, activatedBy: "device" })
+    })
+    return await res.json()
 }
 
-async function checkDeviceAccess(accessCode, fp, token) {
-    // Ưu tiên token
-    if (token) {
-        let { data } = await sb.from("device_whitelist")
-            .select("id, status, device_token, fingerprint")
-            .eq("username", accessCode).eq("device_token", token).maybeSingle()
-        if (data) {
-            if (fp && data.fingerprint !== fp) {
-                fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_fingerprint", id: data.id, fingerprint: fp }) }).catch(() => {})
-            }
-            return { status: data.status, id: data.id, device_token: data.device_token }
-        }
-    }
-    // Fallback fingerprint
-    let { data, error } = await sb.from("device_whitelist")
-        .select("id, status, device_token")
-        .eq("username", accessCode).eq("fingerprint", fp).maybeSingle()
-    if (error) return { status: "error" }
-    if (!data) return { status: "unknown" }
-    return { status: data.status, id: data.id, device_token: data.device_token }
+async function logLogin(deviceCodeId, username) {
+    let geo = await getGeo()
+    sb.from("device_login_history").insert({
+        device_code_id: deviceCodeId, username, app_source: "wood-measure",
+        ip_address: geo.ip, city: geo.city, region: geo.region, country: geo.country, user_agent: navigator.userAgent
+    }).then(() => {}).catch(() => {})
 }
 
-async function registerDeviceAccess(accessCode, fp, geo) {
-    let token = getDeviceToken()
-    // Ưu tiên 1: tìm bằng device_token (ổn định hơn fingerprint)
-    if (token) {
-        let { data: byToken } = await sb.from("device_whitelist")
-            .select("id, device_token, fingerprint").eq("username", accessCode).eq("device_token", token).maybeSingle()
-        if (byToken) {
-            // Cùng thiết bị — cập nhật fingerprint mới + geo, không tạo dòng mới
-            let updates = { action: "update_last_seen", id: byToken.id, ip: geo?.ip, city: geo?.city, region: geo?.region, country: geo?.country, lat: geo?.lat, lon: geo?.lon }
-            if (fp && byToken.fingerprint !== fp) updates.action = "update_fingerprint_and_seen"
-            fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify(fp && byToken.fingerprint !== fp ? { action: "update_fingerprint", id: byToken.id, fingerprint: fp } : updates) }).catch(() => {})
-            if (fp && byToken.fingerprint !== fp) {
-                fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_last_seen", id: byToken.id, ip: geo?.ip, city: geo?.city, region: geo?.region, country: geo?.country, lat: geo?.lat, lon: geo?.lon }) }).catch(() => {})
-            }
-            return { success: true, device_token: byToken.device_token }
-        }
-    }
-    // Ưu tiên 2: tìm bằng fingerprint
-    let { data: byFp } = await sb.from("device_whitelist")
-        .select("id, device_token").eq("username", accessCode).eq("fingerprint", fp).maybeSingle()
-    if (byFp) {
-        fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_last_seen", id: byFp.id, ip: geo?.ip, city: geo?.city, region: geo?.region, country: geo?.country, lat: geo?.lat, lon: geo?.lon }) }).catch(() => {})
-        return { success: true, device_token: byFp.device_token }
-    }
-    // Không tìm thấy → insert mới
-    let insert = { username: accessCode, fingerprint: fp, user_agent: navigator.userAgent || "", ip_address: geo?.ip || "", city: geo?.city || "", region: geo?.region || "", country: geo?.country || "", lat: geo?.lat || null, lon: geo?.lon || null, status: "pending", app_source: "wood-measure" }
-    let { data, error } = await sb.from("device_whitelist").insert(insert).select("device_token").single()
-    if (error) return { error: error.message }
-    return { success: true, device_token: data?.device_token }
-}
-
-async function fetchDeviceRestrictionEnabled() {
+async function fetchRestrictionOn() {
     let { data } = await sb.from("device_settings").select("value").eq("key", "restriction_wood_measure").maybeSingle()
     return data?.value === true || data?.value === "true"
 }
@@ -213,105 +166,61 @@ function showDeviceStatus(type) {
     let el = document.getElementById("deviceStatusMsg")
     let formEls = document.querySelectorAll("#accessInput, #accessBtn, .accessDesc")
     if (!el) return
-    if (type === "pending" || type === "blocked") {
+    if (type === "blocked") {
         formEls.forEach(e => e.style.display = "none")
         el.style.display = "block"
-        if (type === "pending") {
-            el.style.background = "#FEF3C7"
-            el.style.border = "1px solid #F59E0B"
-            el.style.color = "#92400E"
-            el.innerHTML = "<b>Thiết bị chưa được phê duyệt</b><br>Thiết bị đã được ghi nhận, đang chờ quản trị viên phê duyệt.<br><button onclick='retryDeviceCheck()' style='margin-top:10px;padding:8px 20px;border-radius:8px;border:none;background:#D97706;color:#fff;font-weight:700;font-size:0.82rem;cursor:pointer'>Thử lại</button>"
-        } else {
-            el.style.background = "#FEE2E2"
-            el.style.border = "1px solid #EF4444"
-            el.style.color = "#991B1B"
-            el.innerHTML = "<b>Thiết bị đã bị chặn</b><br>Thiết bị không được phép truy cập. Liên hệ quản trị viên.<br><button onclick='retryDeviceCheck()' style='margin-top:10px;padding:8px 20px;border-radius:8px;border:none;background:#991B1B;color:#fff;font-weight:700;font-size:0.82rem;cursor:pointer'>Thử lại</button>"
-        }
+        el.style.background = "#FEE2E2"
+        el.style.border = "1px solid #EF4444"
+        el.style.color = "#991B1B"
+        el.innerHTML = "<b>Thiết bị chưa được kích hoạt</b><br>Liên hệ quản trị viên để nhập mã kích hoạt.<br><button onclick='retryAccess()' style='margin-top:10px;padding:8px 20px;border-radius:8px;border:none;background:#991B1B;color:#fff;font-weight:700;font-size:0.82rem;cursor:pointer'>Thử lại</button>"
     } else {
         el.style.display = "none"
         formEls.forEach(e => e.style.display = "")
     }
 }
-function retryDeviceCheck() {
+
+function retryAccess() {
     showDeviceStatus(null)
-    document.getElementById("accessLoading").innerText = "Đang kiểm tra thiết bị..."
+    document.getElementById("accessLoading").innerText = "Đang kiểm tra..."
     verifySavedAccess().finally(() => {
         document.getElementById("accessLoading").innerText = ""
     })
 }
 
-/** Xử lý device check chung — trả về true nếu cho vào app */
-async function handleDeviceCheck(accessCode, showBlockUI) {
-    // Bước 1: kiểm tra restriction
+/** Kiểm tra mã thiết bị — trả về true nếu cho vào app */
+async function checkDeviceCode(showBlockUI) {
     let restrictionOn = false
-    try {
-        restrictionOn = await Promise.race([fetchDeviceRestrictionEnabled(), new Promise((_, rej) => setTimeout(() => rej(), 3000))])
-    } catch {}
+    try { restrictionOn = await Promise.race([fetchRestrictionOn(), new Promise((_, rej) => setTimeout(() => rej(), 3000))]) } catch {}
+    if (!restrictionOn) return true
 
-    if (!restrictionOn) {
-        // Thu thập — không chặn
-        getDeviceFingerprint().then(fp => {
-            if (fp) getIpGeoLocation().then(geo => registerDeviceAccess(accessCode, fp, geo).then(r => { if (r.device_token) saveDeviceToken(r.device_token) })).catch(() => {})
-        }).catch(() => {})
-        return true
+    // Restriction ON
+    let savedHash = getDeviceCodeHash()
+    if (!savedHash) {
+        if (showBlockUI) showDeviceStatus("blocked")
+        return false
     }
 
-    // Bước 2: Restriction ON — phải check device, mọi lỗi đều chặn
     try {
-        let [fp, geo] = await Promise.all([
-            getDeviceFingerprint().catch(() => null),
-            getIpGeoLocation().catch(() => ({ ip: "" })),
-        ])
-        let token = getDeviceToken()
-
-        if (!fp) {
-            if (showBlockUI) showDeviceStatus("pending")
-            return false
-        }
-
-        let result
-        try {
-            result = await Promise.race([checkDeviceAccess(accessCode, fp, token), new Promise((_, rej) => setTimeout(() => rej("timeout"), 3000))])
-        } catch {
-            // Offline / timeout — dùng cache
-            let cache = getCachedDeviceStatus()
-            if (cache && cache.status === "blocked") { if (showBlockUI) showDeviceStatus("blocked"); return false }
-            if (isDeviceCacheValid(cache) && cache.status === "approved") return true
-            // Không có cache hợp lệ + offline → chặn
-            if (showBlockUI) showDeviceStatus("pending")
-            return false
-        }
-
-        if (result.status === "approved") {
-            if (result.device_token) saveDeviceToken(result.device_token)
-            saveCachedDeviceStatus("approved", result.id)
-            fetch(DEVICE_FN_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-device-secret": DEVICE_SECRET }, body: JSON.stringify({ action: "update_last_seen", id: result.id, ip: geo.ip, city: geo.city, region: geo.region, country: geo.country, lat: geo.lat, lon: geo.lon }) }).catch(() => {})
+        let result = await Promise.race([verifyDeviceCode(savedHash), new Promise((_, rej) => setTimeout(() => rej(), 3000))])
+        if (result.status === "active") {
+            saveCachedDevice("active", result.id)
             return true
         }
-        if (result.status === "pending") {
-            saveCachedDeviceStatus("pending", result.id)
-            if (showBlockUI) showDeviceStatus("pending")
-            return false
-        }
-        if (result.status === "blocked") {
-            saveCachedDeviceStatus("blocked", result.id)
-            if (showBlockUI) showDeviceStatus("blocked")
-            return false
-        }
-        // unknown → register (không ghi đè status nếu đã tồn tại)
-        let reg = await registerDeviceAccess(accessCode, fp, geo)
-        if (reg.device_token) saveDeviceToken(reg.device_token)
-        saveCachedDeviceStatus("pending", null)
-        if (showBlockUI) showDeviceStatus("pending")
+        // Mã không còn hợp lệ
+        localStorage.removeItem(DEVICE_CODE_KEY)
+        localStorage.removeItem(DEVICE_CACHE_KEY)
+        if (showBlockUI) showDeviceStatus("blocked")
         return false
     } catch {
-        // Restriction ON + bất kỳ lỗi nào → chặn
-        if (showBlockUI) showDeviceStatus("pending")
+        // Offline — dùng cache
+        let cache = getCachedDevice()
+        if (isCacheValid(cache) && cache.status === "active") return true
+        if (showBlockUI) showDeviceStatus("blocked")
         return false
     }
 }
 
-/* ACCESS — v2: dùng Supabase thay device.json */
+/* ACCESS — v2: dùng Supabase */
 const ACCESS_KEY = "woodAccessCode_v2"
 
 async function validateAccessCode(code) {
@@ -332,39 +241,50 @@ async function validateAccessCode(code) {
         return false
     }
 }
+
 async function checkAccessCode() {
     let input = document.getElementById("accessInput")
     let btn = document.getElementById("accessBtn")
     let error = document.getElementById("accessError")
     let loading = document.getElementById("accessLoading")
     let code = input.value.trim()
-    if (!code) {
-        error.innerText = "Vui lòng nhập mã truy cập"
-        return
-    }
+    if (!code) { error.innerText = "Vui lòng nhập mã truy cập"; return }
     btn.disabled = true
     loading.innerText = "Đang kiểm tra..."
     error.innerText = ""
     showDeviceStatus(null)
+
     let ok = await validateAccessCode(code)
     if (!ok) {
-        btn.disabled = false
-        loading.innerText = ""
+        btn.disabled = false; loading.innerText = ""
         error.innerText = "Mã không hợp lệ"
         if (navigator.vibrate) navigator.vibrate(200)
         input.focus()
         return
     }
-    // Access code OK → device check
-    let deviceOk = await handleDeviceCheck(code.toLowerCase().trim(), true)
-    btn.disabled = false
-    loading.innerText = ""
+
+    // Access code hợp lệ → migrate ngầm: hash access code làm device code
+    let codeHash = await sha256(code.toLowerCase().trim())
+    let savedHash = getDeviceCodeHash()
+    if (!savedHash) {
+        // Thiết bị chưa có device code → tự gán từ access code (migrate ngầm)
+        saveDeviceCodeHash(codeHash)
+        // Kích hoạt nếu chưa active
+        activateDeviceCode(codeHash).catch(() => {})
+    }
+
+    // Device code check
+    let deviceOk = await checkDeviceCode(true)
+    btn.disabled = false; loading.innerText = ""
     if (deviceOk) {
         localStorage.setItem(ACCESS_KEY, JSON.stringify({ code: code.toLowerCase().trim(), user: currentUser, defaultType: currentMeasurementType }))
         document.getElementById("accessScreen").style.display = "none"
+        // Ghi lịch sử
+        let hash = getDeviceCodeHash()
+        if (hash) verifyDeviceCode(hash).then(r => { if (r.id) logLogin(r.id, currentUser) }).catch(() => {})
     }
-    // Nếu !deviceOk → showDeviceStatus đã hiện thông báo
 }
+
 async function verifySavedAccess() {
     let raw = localStorage.getItem(ACCESS_KEY)
     if (!raw) {
@@ -374,10 +294,9 @@ async function verifySavedAccess() {
     }
     try {
         let saved = JSON.parse(raw)
-        // Thử validate access code (cần internet)
+        // Validate access code (online) or fallback (offline)
         let ok = false
-        try { ok = await Promise.race([validateAccessCode(saved.code), new Promise((_, rej) => setTimeout(() => rej("timeout"), 3000))]) } catch {
-            // Offline → dùng saved code trực tiếp
+        try { ok = await Promise.race([validateAccessCode(saved.code), new Promise((_, rej) => setTimeout(() => rej(), 3000))]) } catch {
             currentUser = saved.user || ""
             currentMeasurementType = saved.defaultType || "order_split"
             ok = true
@@ -388,10 +307,21 @@ async function verifySavedAccess() {
             setTimeout(() => accessInput.focus(), 200)
             return
         }
-        // Access OK → device check
-        let deviceOk = await handleDeviceCheck(saved.code, true)
+
+        // Migrate ngầm: nếu chưa có device code hash → tạo từ access code
+        if (!getDeviceCodeHash()) {
+            let codeHash = await sha256(saved.code)
+            saveDeviceCodeHash(codeHash)
+            activateDeviceCode(codeHash).catch(() => {})
+        }
+
+        // Device code check
+        let deviceOk = await checkDeviceCode(true)
         if (deviceOk) {
             document.getElementById("accessScreen").style.display = "none"
+            // Ghi lịch sử
+            let hash = getDeviceCodeHash()
+            if (hash) verifyDeviceCode(hash).then(r => { if (r.id) logLogin(r.id, currentUser) }).catch(() => {})
         } else {
             document.getElementById("accessScreen").style.display = "flex"
         }
