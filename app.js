@@ -8,6 +8,27 @@ function getDateTime() {
     return d + "/" + m + "/" + y + "  " + h + ":" + min
 }
 
+// Tính KL m³ từ list tấm — match công thức Excel lý lịch gỗ:
+//   Mỗi cột dài: mid = ROUNDDOWN(SUM_widths × length × thickness / 10, 0) → cm³
+//   Tổng: SUM(mid) / 10000 → m³ (4 chữ số chính xác)
+// boards: [{l: dm, w: cm}], thickCm: cm. Khớp tuyệt đối với KL Excel cũ.
+function calcVolumeFromBoards(boards, thickCm) {
+    let t = parseFloat(thickCm) || 0
+    if (!boards || !boards.length || t <= 0) return 0
+    let byLen = {}
+    for (let b of boards) {
+        let l = parseFloat(b.l) || 0
+        let w = parseFloat(b.w) || 0
+        if (l <= 0 || w <= 0) continue
+        byLen[l] = (byLen[l] || 0) + w
+    }
+    let midSum = 0
+    for (let lStr in byLen) {
+        midSum += Math.floor(byLen[lStr] * parseFloat(lStr) * t / 10)
+    }
+    return midSum / 10000
+}
+
 /* TURN */
 let activeTurn = 1
 
@@ -396,11 +417,8 @@ document.addEventListener("click", function (e) {
 
 /* SYNC lên hệ thống */
 function calcVolume() {
-    let vol = 0
-    boards.forEach(b => {
-        vol += (b.l / 10) * (b.w / 100) * (thickness.value / 100)
-    })
-    return parseFloat(vol.toFixed(6))
+    // Excel-compat (khớp Lý lịch gỗ cũ) — group by length, ROUNDDOWN per length, sum, /10000
+    return calcVolumeFromBoards(boards, thickness.value)
 }
 
 async function syncToSystem() {
@@ -1038,10 +1056,7 @@ function createButtons() {
 
 /* SUMMARY */
 function updateSummary() {
-    let vol = 0
-    boards.forEach(b => {
-        vol += (b.l / 10) * (b.w / 100) * (thickness.value / 100)
-    })
+    let vol = calcVolumeFromBoards(boards, thickness.value) // Excel-compat
     summary.innerText = boards.length + " tấm • " + vol.toFixed(4) + " m³"
 }
 
@@ -1089,10 +1104,44 @@ function renderTurnSummary(groups) {
     })
 }
 function deleteBoard(i) {
+    let removed = boards[i]
     boards.splice(i, 1)
     updateSummary()
     renderList()
     saveState()
+    showUndoToast("Đã xóa tấm " + removed.l + " × " + removed.w, () => {
+        boards.splice(i, 0, removed)
+        updateSummary()
+        renderList()
+        saveState()
+    })
+}
+
+let _undoToastTimer = null
+function showUndoToast(msg, onUndo) {
+    let t = document.getElementById("undoToast")
+    if (!t) {
+        t = document.createElement("div")
+        t.id = "undoToast"
+        t.style.cssText = "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1C1209;color:#fff;padding:10px 14px 10px 18px;border-radius:12px;display:none;z-index:99999;font-size:14px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;gap:14px;max-width:90vw"
+        document.body.appendChild(t)
+    }
+    if (_undoToastTimer) clearTimeout(_undoToastTimer)
+    t.innerHTML = ""
+    let span = document.createElement("span")
+    span.innerText = msg
+    let btn = document.createElement("button")
+    btn.innerText = "Hoàn tác"
+    btn.style.cssText = "background:transparent;color:#F26522;border:none;font-size:14px;font-weight:700;padding:4px 8px;cursor:pointer;border-radius:6px;flex-shrink:0"
+    btn.onclick = () => {
+        onUndo()
+        t.style.display = "none"
+        if (_undoToastTimer) clearTimeout(_undoToastTimer)
+    }
+    t.appendChild(span)
+    t.appendChild(btn)
+    t.style.display = "flex"
+    _undoToastTimer = setTimeout(() => { t.style.display = "none" }, 5000)
 }
 function confirmResetBoards() {
     showConfirm("Lưu & Reset", "Session hiện tại sẽ được lưu vào lịch sử và bắt đầu kiện mới.", resetBoards)
@@ -1132,10 +1181,7 @@ function showMatrix() {
     go("matrix")
 }
 function updateMatrixHeader() {
-    let vol = 0
-    boards.forEach(b => {
-        vol += (b.l / 10) * (b.w / 100) * (thickness.value / 100)
-    })
+    let vol = calcVolumeFromBoards(boards, thickness.value) // Excel-compat
     let info = [bundle.value, woodType.value, thickness.value + "F", quality.value]
         .filter(v => v != "")
         .join(" • ")
