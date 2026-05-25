@@ -422,12 +422,13 @@ function calcVolume() {
 }
 
 async function syncToSystem() {
-    if (!currentUser || !currentSessionId || boards.length === 0) return
+    if (!currentUser) return { ok: false, reason: "Chưa đăng nhập (thiếu tên người đo)" }
+    if (!currentSessionId || boards.length === 0) return { ok: false, reason: "Chưa có dữ liệu để đồng bộ" }
     try {
         // session_id unique per kiện (tạo 1 lần khi startMeasure, reset khi "Kiện mới")
         // Cùng session chia sẻ lại → upsert update (cập nhật số tấm/khối lượng)
         // Khác session cùng mã kiện → tạo record mới (soạn lẻ cho khách khác)
-        await sb.from("bundle_measurements").upsert({
+        let { error } = await sb.from("bundle_measurements").upsert({
             session_id: currentSessionId,
             bundle_code: bundle.value.trim(),
             wood_type: woodType.value.trim(),
@@ -444,9 +445,10 @@ async function syncToSystem() {
             deleted: false,
             updated_at: new Date().toISOString()
         }, { onConflict: "session_id" })
-        showToast("Đã đồng bộ ✓", "success")
+        if (error) return { ok: false, reason: error.message }
+        return { ok: true }
     } catch (e) {
-        /* im lặng — không ảnh hưởng flow Zalo */
+        return { ok: false, reason: e.message || "Lỗi kết nối" }
     }
 }
 
@@ -1274,6 +1276,17 @@ async function shareMatrixZalo() {
             return
         }
     }
+
+    // Đồng bộ lên hệ thống TRƯỚC khi chia sẻ (không phụ thuộc share thành công)
+    let syncResult = { ok: false, reason: "Bỏ qua" }
+    if (currentMeasurementType === "order_split") {
+        syncResult = await syncToSystem()
+        if (syncResult.ok) showToast("Đã đồng bộ ✓", "success")
+        else showToast("⚠ Chưa đồng bộ: " + syncResult.reason, "error")
+    } else {
+        syncResult.ok = true // kiện nguyên không cần sync
+    }
+
     try {
         let el = document.getElementById("matrixCaptureArea")
         let table = el.querySelector("table")
@@ -1295,6 +1308,15 @@ async function shareMatrixZalo() {
         sel.style.display = "none"
         sel.parentNode.insertBefore(tempSpan, sel.nextSibling)
 
+        /* Nếu sync fail → chèn dòng cảnh báo nhỏ vào ảnh để quản trị viên biết */
+        let syncWarn = null
+        if (!syncResult.ok) {
+            syncWarn = document.createElement("div")
+            syncWarn.innerText = "⚠ CHƯA ĐỒNG BỘ HỆ THỐNG — báo quản trị viên kiểm tra"
+            syncWarn.style.cssText = "font-size:11px;font-weight:700;color:#B91C1C;background:#FEE2E2;padding:4px 8px;border-radius:4px;margin-top:6px;text-align:center"
+            el.appendChild(syncWarn)
+        }
+
         let canvas
         try {
             canvas = await html2canvas(el, {
@@ -1310,6 +1332,7 @@ async function shareMatrixZalo() {
             sel.style.display = ""
             el.style.removeProperty("width")
             if (table) table.style.transform = oldTransform
+            if (syncWarn) syncWarn.remove()
         }
 
         canvas.toBlob(async function (blob) {
@@ -1318,7 +1341,6 @@ async function shareMatrixZalo() {
                 try {
                     await navigator.share({ files: [file], title: "" })
                     showToast("Chia sẻ thành công", "success")
-                    syncToSystem()
                 } catch (shareErr) {
                     /* User cancel share dialog — không báo lỗi */
                 }
