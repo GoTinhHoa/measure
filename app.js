@@ -246,14 +246,17 @@ const ACCESS_KEY = "woodAccessCode_v2"
 
 async function validateAccessCode(code) {
     try {
-        let { data } = await sb.from("measure_devices")
-            .select("user_name, default_type")
-            .eq("code", code.toLowerCase().trim())
-            .eq("active", true)
-            .single()
-        if (data) {
-            currentUser = data.user_name
-            currentMeasurementType = data.default_type || "order_split"
+        // Đọc device_codes (nguồn chính), khớp mã không phân biệt hoa thường, loại mã đã thu hồi
+        let { data } = await sb.from("device_codes")
+            .select("user_name, default_type, status")
+            .ilike("code", code.trim())
+            .eq("app_source", "wood-measure")
+            .neq("status", "revoked")
+            .limit(1)
+        let row = data && data[0]
+        if (row) {
+            currentUser = row.user_name || ""
+            currentMeasurementType = row.default_type || "order_split"
             updateMeasurementTypeUI()
             return true
         }
