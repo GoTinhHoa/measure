@@ -1,4 +1,4 @@
-const CACHE_NAME = "wood-measure-v10";
+const CACHE_NAME = "wood-measure-v11";
 
 const urlsToCache = [
     "./",

@@ -555,7 +555,7 @@ let widMin = 15
 let widMax = 35
 let woodUS = false
 let currentSessionId = null
-const MAX_SAVED_LISTS = 15
+const MAX_SAVED_LISTS = 30
 let woodTypeList = [] // [{id, name}] từ DB
 let selectedWoodId = "" // wood_id đã chọn
 
