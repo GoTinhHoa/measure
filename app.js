@@ -1281,14 +1281,11 @@ async function shareMatrixZalo() {
     }
 
     // Đồng bộ lên hệ thống TRƯỚC khi chia sẻ (không phụ thuộc share thành công)
-    let syncResult = { ok: false, reason: "Bỏ qua" }
-    if (currentMeasurementType === "order_split") {
-        syncResult = await syncToSystem()
-        if (syncResult.ok) showToast("Đã đồng bộ ✓", "success")
-        else showToast("⚠ Chưa đồng bộ: " + syncResult.reason, "error")
-    } else {
-        syncResult.ok = true // kiện nguyên không cần sync
-    }
+    // Cả 2 mode đều sync: order_split → PgSales "DS kiện lẻ vừa soạn",
+    // whole_bundle → PgKiln "mẻ xếp" (filter measurement_type)
+    let syncResult = await syncToSystem()
+    if (syncResult.ok) showToast("Đã đồng bộ ✓", "success")
+    else showToast("⚠ Chưa đồng bộ: " + syncResult.reason, "error")
 
     try {
         let el = document.getElementById("matrixCaptureArea")
