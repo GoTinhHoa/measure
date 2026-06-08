@@ -33,6 +33,7 @@
             }
         })();
     </script>
+    <script src="version.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
@@ -79,6 +80,7 @@
         <div class="header">
             <img src="logo-192.png" class="headerLogo">
             <span>Cấu hình kiện</span>
+            <span class="appVersionPill"></span>
         </div>
         <div class="card">
             <div class="formGrid">
@@ -86,6 +88,7 @@
                     <label class="fieldLabel">Mã kiện</label>
                     <input id="bundle" oninput="this.value=this.value.toUpperCase()" onblur="lookupBundle()">
                     <div id="bundleLookupStatus" style="font-size:11px;margin-top:3px;min-height:16px"></div>
+                    <div id="bundleBagStatus" style="font-size:11px;margin-top:2px;min-height:16px"></div>
                 </div>
                 <div style="position:relative">
                     <label class="fieldLabel">Loại gỗ</label>
@@ -146,6 +149,7 @@
         <div class="header">
             <img src="logo-192.png" class="headerLogo">
             <span id="headerInfo"></span>
+            <span class="appVersionPill"></span>
         </div>
         <div class="card" style="display:flex;justify-content:space-between">
             <button class="smallBtn" onclick="go('setup')">← Cấu hình</button>
@@ -214,6 +218,7 @@
         <div class="header">
             <img src="logo-192.png" class="headerLogo">
             <span>List chi tiết</span>
+            <span class="appVersionPill"></span>
         </div>
         <div class="card matrixToolbar">
             <button class="smallBtn" onclick="go('measure')">← Quay lại</button>
@@ -228,6 +233,7 @@
                             <span id="matrixPieces"></span>
                             <span id="matrixVolume"></span>
                         </div>
+                        <div id="matrixMismatch" style="display:none;margin-top:6px;padding:4px 8px;border-radius:6px;background:#FFF7ED;border:1px solid #F97316;color:#9A3412;font-size:11px;font-weight:600"></div>
                     </div>
                     <div style="text-align:right;flex-shrink:0;white-space:nowrap">
                         <div id="matrixDate"></div>

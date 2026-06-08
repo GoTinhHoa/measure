@@ -126,6 +126,30 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 let currentUser = ""
 let currentMeasurementType = "order_split" // 'order_split' | 'whole_bundle'
 
+/* ===== ORIGINAL BAG — đối chiếu tấm soạn lẻ với list gốc ===== */
+let originalBag = null          // Map<"l×w", count> hoặc null (chưa có gốc → im lặng)
+let originalTotalCount = 0      // Tổng tấm trong gốc
+let originalSoldCount = 0       // Tổng tấm đã bán qua các đơn trước
+function bagKey(l, w) { return l + "×" + w }
+function getRemainingInBag(l, w) {
+    if (!originalBag) return null
+    let used = boards.filter(b => b.l === l && b.w === w).length
+    let inBag = originalBag.get(bagKey(l, w)) || 0
+    return { inOriginal: inBag, current: inBag - used }
+}
+/* Trả về null (OK/im lặng), "not_in_original", hoặc "sold_out" */
+function checkBoardAgainstBag(l, w) {
+    if (!originalBag) return null // không có gốc → im lặng
+    let used = boards.filter(b => b.l === l && b.w === w).length
+    let inBag = originalBag.get(bagKey(l, w)) || 0
+    if (inBag <= 0) return "not_in_original"
+    if (inBag - used <= 0) return "sold_out"
+    return null
+}
+function getMismatchCount() {
+    return boards.filter(b => b.mismatch).length
+}
+
 /* ===== DEVICE CODE — mã thiết bị do admin quản lý ===== */
 const DEVICE_CODE_KEY = "wood_device_code_hash"
 const DEVICE_CACHE_KEY = "wood_device_cache"
@@ -444,6 +468,7 @@ async function syncToSystem() {
             measured_by: currentUser,
             measurement_type: currentMeasurementType,
             bundle_check: document.getElementById("bundleStatus").value || "-",
+            mismatch_count: getMismatchCount(),
             status: "chờ gán",
             deleted: false,
             updated_at: new Date().toISOString()
@@ -495,6 +520,66 @@ function onMeasureTypeToggle() {
     )
 }
 
+/* Load list gốc + tổng tấm đã bán → tính bag còn lại */
+async function loadOriginalBag(bundleCode) {
+    originalBag = null
+    originalTotalCount = 0
+    originalSoldCount = 0
+    let bagEl = document.getElementById("bundleBagStatus")
+    if (bagEl) bagEl.innerHTML = ""
+    if (!bundleCode) return
+    try {
+        /* Lấy bản whole_bundle mới nhất của mã này */
+        let { data: gốc } = await sb.from("bundle_measurements")
+            .select("boards")
+            .eq("bundle_code", bundleCode)
+            .eq("measurement_type", "whole_bundle")
+            .eq("deleted", false)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        if (!gốc || !Array.isArray(gốc.boards) || gốc.boards.length === 0) return
+        /* Lấy tất cả order_split đã gán cho mã này */
+        let { data: đã } = await sb.from("bundle_measurements")
+            .select("boards")
+            .eq("bundle_code", bundleCode)
+            .eq("measurement_type", "order_split")
+            .eq("status", "đã gán")
+            .eq("deleted", false)
+            .not("order_id", "is", null)
+        let bag = new Map()
+        gốc.boards.forEach(b => {
+            let k = bagKey(b.l, b.w)
+            bag.set(k, (bag.get(k) || 0) + 1)
+        })
+        originalTotalCount = gốc.boards.length
+        ;(đã || []).forEach(row => {
+            ;(row.boards || []).forEach(b => {
+                let k = bagKey(b.l, b.w)
+                bag.set(k, (bag.get(k) || 0) - 1)
+                originalSoldCount++
+            })
+        })
+        originalBag = bag
+        renderBagStatus()
+    } catch (e) {
+        /* im lặng — không có gốc thì thôi */
+    }
+}
+
+function renderBagStatus() {
+    let bagEl = document.getElementById("bundleBagStatus")
+    if (!bagEl) return
+    if (!originalBag) { bagEl.innerHTML = ""; return }
+    let remaining = originalTotalCount - originalSoldCount
+    if (remaining <= 0) {
+        bagEl.innerHTML = "<span style='color:#92400E;font-weight:600'>⚠ Kiện gốc đã bán hết " + originalSoldCount + "/" + originalTotalCount + " tấm — tấm đo thêm sẽ báo không khớp</span>"
+    } else {
+        let soldMsg = originalSoldCount > 0 ? " (đã bán " + originalSoldCount + " tấm)" : ""
+        bagEl.innerHTML = "<span style='color:#1E5C38;font-weight:600'>📦 Kiện gốc " + originalTotalCount + " tấm · còn " + remaining + " tấm" + soldMsg + "</span>"
+    }
+}
+
 /* LOOKUP mã kiện NCC → auto-fill loại gỗ, dày, chất lượng */
 let lastLookupCode = ""
 async function lookupBundle() {
@@ -541,6 +626,10 @@ async function lookupBundle() {
         }
     } catch (e) {
         statusEl.innerHTML = "<span style='color:#92400E'>Không tìm thấy — nhập thủ công</span>"
+    }
+    /* Load list gốc của kiện để đối chiếu khi đo lẻ */
+    if (currentMeasurementType === "order_split") {
+        loadOriginalBag(code)
     }
 }
 
@@ -1042,11 +1131,17 @@ function createButtons() {
         b.onclick = () => {
             if (selectedLength == null) return
             speakNumber(v)
-            boards.push({
-                l: selectedLength,
-                w: v,
-                turn: activeTurn
-            })
+            let mismatch = checkBoardAgainstBag(selectedLength, v)
+            let newBoard = { l: selectedLength, w: v, turn: activeTurn }
+            if (mismatch) newBoard.mismatch = mismatch
+            boards.push(newBoard)
+            if (mismatch) {
+                let reason = mismatch === "not_in_original"
+                    ? "không có trong kiện gốc"
+                    : "đã bán hết"
+                showToast("⚠ " + selectedLength + " × " + v + " " + reason, "warning")
+                if (navigator.vibrate) navigator.vibrate(80)
+            }
             selectedLength = null
             document.querySelectorAll("#lengthGrid button")
                 .forEach(x => x.classList.remove("selected"))
@@ -1086,9 +1181,11 @@ function renderList(highlightNew) {
         arr.slice().reverse().forEach((b) => {
             let index = boards.indexOf(b)
             let row = document.createElement("div")
-            row.className = "boardRow" + (index === lastIndex ? " newBoard" : "")
+            let mismatchCls = b.mismatch ? " boardMismatch" : ""
+            row.className = "boardRow" + (index === lastIndex ? " newBoard" : "") + mismatchCls
+            let warn = b.mismatch ? "<span class='boardWarn'>⚠</span> " : ""
             row.innerHTML =
-                "<span>" + b.l + " × " + b.w + "</span>" +
+                "<span>" + warn + b.l + " × " + b.w + "</span>" +
                 "<button class='deleteBoardBtn' onclick='deleteBoard(" + index + ")'>×</button>"
             boardList.appendChild(row)
         })
@@ -1193,6 +1290,18 @@ function updateMatrixHeader() {
     matrixHeader.innerText = info
     matrixPieces.innerText = boards.length + " tấm"
     matrixVolume.innerText = vol.toFixed(4) + " m³"
+    /* Badge cảnh báo tấm không khớp gốc */
+    let mismatchEl = document.getElementById("matrixMismatch")
+    if (mismatchEl) {
+        let n = getMismatchCount()
+        if (n > 0) {
+            mismatchEl.style.display = "block"
+            mismatchEl.innerText = "⚠ " + n + " tấm không khớp kiện gốc — kiểm tra trước khi share"
+        } else {
+            mismatchEl.style.display = "none"
+            mismatchEl.innerText = ""
+        }
+    }
 }
 function autoScaleMatrix() {
     let container = document.getElementById("matrixContainer")
@@ -1355,6 +1464,10 @@ async function shareMatrixZalo() {
 
 /* LOAD */
 window.addEventListener("load", async function () {
+    // Hiển thị phiên bản app ở góc phải header (3 màn)
+    if (typeof APP_VERSION !== "undefined") {
+        document.querySelectorAll(".appVersionPill").forEach(el => el.innerText = APP_VERSION)
+    }
     await verifySavedAccess()
     loadWoodTypes()
     accessInput.addEventListener("keypress", function (e) {

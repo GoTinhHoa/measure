@@ -1,10 +1,12 @@
-const CACHE_NAME = "wood-measure-v12";
+importScripts('version.js');
+const CACHE_NAME = "wood-measure-" + APP_VERSION;
 
 const urlsToCache = [
     "./",
     "./index.html",
     "./style.css",
-    "./app.js"
+    "./app.js",
+    "./version.js"
 ];
 
 // Cài đặt: cache các file cần thiết

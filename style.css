@@ -42,6 +42,22 @@ html, body {
     opacity: 0.9;
 }
 
+.appVersionPill {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    font-weight: 700;
+    color: #F26522;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-family: Consolas, monospace;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+}
+
 /* === SCREENS === */
 .screen {
     display: none;
@@ -294,6 +310,18 @@ button:active {
 
 .boardRow.newBoard {
     animation: boardFlash 1.5s ease-out;
+}
+
+.boardRow.boardMismatch {
+    background: #FFF7ED;
+    border-left: 3px solid #F97316;
+    padding-left: 6px;
+}
+
+.boardRow.boardMismatch .boardWarn {
+    color: #F97316;
+    font-weight: 700;
+    margin-right: 2px;
 }
 
 /* === RANGE VALUE TAP === */
