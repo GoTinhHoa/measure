@@ -127,23 +127,20 @@ let currentUser = ""
 let currentMeasurementType = "order_split" // 'order_split' | 'whole_bundle'
 
 /* ===== ORIGINAL BAG — đối chiếu tấm soạn lẻ với list gốc ===== */
-let originalBag = null          // Map<"l×w", count> hoặc null (chưa có gốc → im lặng)
+let originalBag = null          // Map<"l×w", count còn lại = gốc - đã bán>
+let originalKeys = null         // Set<"l×w"> — các size TỪNG có ở gốc (kể cả đã bán hết)
 let originalTotalCount = 0      // Tổng tấm trong gốc
 let originalSoldCount = 0       // Tổng tấm đã bán qua các đơn trước
 function bagKey(l, w) { return l + "×" + w }
-function getRemainingInBag(l, w) {
-    if (!originalBag) return null
-    let used = boards.filter(b => b.l === l && b.w === w).length
-    let inBag = originalBag.get(bagKey(l, w)) || 0
-    return { inOriginal: inBag, current: inBag - used }
-}
 /* Trả về null (OK/im lặng), "not_in_original", hoặc "sold_out" */
 function checkBoardAgainstBag(l, w) {
     if (!originalBag) return null // không có gốc → im lặng
+    let key = bagKey(l, w)
+    let wasInOriginal = originalKeys && originalKeys.has(key)
+    if (!wasInOriginal) return "not_in_original" // size chưa bao giờ có ở gốc
     let used = boards.filter(b => b.l === l && b.w === w).length
-    let inBag = originalBag.get(bagKey(l, w)) || 0
-    if (inBag <= 0) return "not_in_original"
-    if (inBag - used <= 0) return "sold_out"
+    let remaining = originalBag.get(key) || 0
+    if (remaining - used <= 0) return "sold_out" // có gốc nhưng đã hết
     return null
 }
 function getMismatchCount() {
@@ -523,6 +520,7 @@ function onMeasureTypeToggle() {
 /* Load list gốc (từ wood_bundles.raw_measurements.boards) + tấm đã bán → bag còn lại */
 async function loadOriginalBag(bundleCode) {
     originalBag = null
+    originalKeys = null
     originalTotalCount = 0
     originalSoldCount = 0
     let bagEl = document.getElementById("bundleBagStatus")
@@ -545,9 +543,11 @@ async function loadOriginalBag(bundleCode) {
             .eq("deleted", false)
             .not("order_id", "is", null)
         let bag = new Map()
+        let keys = new Set()
         gốcBoards.forEach(b => {
             let k = bagKey(b.l, b.w)
             bag.set(k, (bag.get(k) || 0) + 1)
+            keys.add(k)
         })
         originalTotalCount = gốcBoards.length
         ;(đã || []).forEach(row => {
@@ -558,6 +558,7 @@ async function loadOriginalBag(bundleCode) {
             })
         })
         originalBag = bag
+        originalKeys = keys
         renderBagStatus()
     } catch (e) {
         /* im lặng — không có gốc thì thôi */
