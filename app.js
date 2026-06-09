@@ -520,7 +520,7 @@ function onMeasureTypeToggle() {
     )
 }
 
-/* Load list gốc + tổng tấm đã bán → tính bag còn lại */
+/* Load list gốc (từ wood_bundles.raw_measurements.boards) + tấm đã bán → bag còn lại */
 async function loadOriginalBag(bundleCode) {
     originalBag = null
     originalTotalCount = 0
@@ -529,30 +529,27 @@ async function loadOriginalBag(bundleCode) {
     if (bagEl) bagEl.innerHTML = ""
     if (!bundleCode) return
     try {
-        /* Lấy bản whole_bundle mới nhất của mã này */
-        let { data: gốc } = await sb.from("bundle_measurements")
-            .select("boards")
+        /* Lấy list gốc từ wood_bundles (raw_measurements.boards) */
+        let { data: bundle } = await sb.from("wood_bundles")
+            .select("id, raw_measurements")
             .eq("bundle_code", bundleCode)
-            .eq("measurement_type", "whole_bundle")
-            .eq("deleted", false)
-            .order("updated_at", { ascending: false })
             .limit(1)
             .maybeSingle()
-        if (!gốc || !Array.isArray(gốc.boards) || gốc.boards.length === 0) return
-        /* Lấy tất cả order_split đã gán cho mã này */
+        let gốcBoards = bundle?.raw_measurements?.boards
+        if (!Array.isArray(gốcBoards) || gốcBoards.length === 0) return
+        /* Lấy tất cả bundle_measurements đã gán cho bundle này (cả order_split + whole_bundle khi đem bán) */
         let { data: đã } = await sb.from("bundle_measurements")
             .select("boards")
-            .eq("bundle_code", bundleCode)
-            .eq("measurement_type", "order_split")
+            .eq("bundle_id", bundle.id)
             .eq("status", "đã gán")
             .eq("deleted", false)
             .not("order_id", "is", null)
         let bag = new Map()
-        gốc.boards.forEach(b => {
+        gốcBoards.forEach(b => {
             let k = bagKey(b.l, b.w)
             bag.set(k, (bag.get(k) || 0) + 1)
         })
-        originalTotalCount = gốc.boards.length
+        originalTotalCount = gốcBoards.length
         ;(đã || []).forEach(row => {
             ;(row.boards || []).forEach(b => {
                 let k = bagKey(b.l, b.w)
