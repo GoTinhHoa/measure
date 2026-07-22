@@ -380,19 +380,30 @@ async function verifySavedAccess() {
 /* WOOD TYPE PICKER — load danh sách gỗ từ DB */
 async function loadWoodTypes() {
     try {
-        let { data } = await sb.from("wood_types").select("id, name, product_form").order("name")
-        woodTypeList = (data || []).map(w => ({ id: w.id, name: w.name, productForm: w.product_form || "" }))
+        let { data, error: e1 } = await sb.from("wood_types").select("id, name, product_form").order("name")
+        if (e1) console.log("wood_types err:", e1.message)
+        if (data && data.length) woodTypeList = data.map(w => ({ id: w.id, name: w.name, productForm: w.product_form || "" }))
         /* Cấu hình per-wood: chất lượng + loại gỗ có thuộc tính dong cạnh (NK cần dong) */
-        let { data: cfgRows } = await sb.from("wood_config")
+        let { data: cfgRows, error: e2 } = await sb.from("wood_config")
             .select("wood_id, attr_id, selected_values").in("attr_id", ["quality", "edging"])
+        if (e2) { console.log("wood_config err:", e2.message); return }
+        if (!cfgRows || !cfgRows.length) return // mạng chập / trả rỗng → giữ cfgLoaded=false để tự tải lại
         edgingWoodSet = new Set()
         qualityMap = {}
-        ;(cfgRows || []).forEach(r => {
+        cfgRows.forEach(r => {
             if (r.attr_id === "edging") edgingWoodSet.add(r.wood_id)
             if (r.attr_id === "quality") qualityMap[r.wood_id] = (r.selected_values || "").split(",").map(s => s.trim()).filter(Boolean)
         })
+        cfgLoaded = true
         renderWoodTypeDropdown()
-    } catch (e) { /* silent */ }
+    } catch (e) { console.log("loadWoodTypes err:", e.message || e) }
+}
+
+/* Tự phục hồi: mở app lúc mạng chập → cấu hình chưa tải được thì tải lại khi cần dùng */
+async function ensureCfgLoaded() {
+    if (cfgLoaded) return
+    if (!cfgLoadingPromise) cfgLoadingPromise = loadWoodTypes().finally(() => { cfgLoadingPromise = null })
+    await cfgLoadingPromise
 }
 
 /* Kiện nguyên (mã mới nhập kho): chỉ cho gỗ xẻ sấy trong nước (processed)
@@ -418,7 +429,10 @@ function selectWoodType(id, name) {
     saveState()
 }
 
-function showWoodSuggest() {
+async function showWoodSuggest() {
+    if (currentMeasurementType === "whole_bundle" && !cfgLoaded) {
+        await ensureCfgLoaded() // thiếu cấu hình → danh sách lọc sẽ thiếu gỗ NK dong cạnh
+    }
     updateWoodSuggest(woodType.value)
 }
 
@@ -464,8 +478,9 @@ function onQualityInput(el) {
     updateQualitySuggest(el.value)
 }
 
-function showQualitySuggest() {
+async function showQualitySuggest() {
     if (currentMeasurementType !== "whole_bundle") return
+    if (!cfgLoaded) await ensureCfgLoaded()
     updateQualitySuggest(quality.value)
 }
 
@@ -478,7 +493,8 @@ function updateQualitySuggest(query) {
         let hint = document.createElement("div")
         hint.className = "woodSuggestItem"
         hint.style.color = "#92400E"
-        hint.innerText = !selectedWoodId ? "Chọn loại gỗ trước" : "Loại gỗ chưa cấu hình chất lượng — báo admin"
+        hint.innerText = !selectedWoodId ? "Chọn loại gỗ trước"
+            : (!cfgLoaded ? "Không tải được cấu hình — kiểm tra mạng, thử lại" : "Loại gỗ chưa cấu hình chất lượng — báo admin")
         container.appendChild(hint)
         container.classList.add("open")
         return
@@ -724,6 +740,8 @@ let woodTypeList = [] // [{id, name, productForm}] từ DB
 let selectedWoodId = "" // wood_id đã chọn
 let edgingWoodSet = new Set() // wood_id có cấu hình dong cạnh (NK cần dong)
 let qualityMap = {} // wood_id → [chất lượng cấu hình]
+let cfgLoaded = false // wood_config tải thành công chưa (false → ensureCfgLoaded tự tải lại)
+let cfgLoadingPromise = null
 
 /* LOCAL STORAGE */
 function saveState() {
@@ -1006,7 +1024,7 @@ function toggleWoodUS() {
 }
 
 /* START */
-function startMeasure() {
+async function startMeasure() {
     if (bundle.value.trim() == "") {
         alert("Vui lòng nhập mã kiện")
         bundle.focus()
@@ -1024,6 +1042,8 @@ function startMeasure() {
     }
     /* Kiện nguyên (mã mới nhập kho): chặn cứng loại gỗ + chất lượng theo cấu hình — tránh kiện lệch SKU */
     if (currentMeasurementType === "whole_bundle") {
+        if (!cfgLoaded) await ensureCfgLoaded()
+        if (!cfgLoaded) { alert("Chưa tải được cấu hình loại gỗ/chất lượng — kiểm tra mạng rồi thử lại"); return }
         let allowed = allowedWoodsForWhole()
         let w = allowed.find(x => x.id === selectedWoodId)
         if (!w) {
