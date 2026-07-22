@@ -1369,10 +1369,12 @@ function showUndoToast(msg, onUndo) {
     _undoToastTimer = setTimeout(() => { t.style.display = "none" }, 5000)
 }
 function confirmResetBoards() {
+    if (boards.length === 0) { resetBoards(); return } // chưa có tấm đo → không mất gì, clear luôn không cần hỏi
     showConfirm("Lưu & Reset", "Session hiện tại sẽ được lưu vào lịch sử và bắt đầu kiện mới.", resetBoards)
 }
 function resetBoards() {
     /* Lưu session hiện tại trước khi reset */
+    let hadBoards = boards.length > 0
     saveCurrentSession()
     boards = []
     currentTurn = 1
@@ -1389,12 +1391,23 @@ function resetBoards() {
     quality.value = ""
     let bsSel = document.getElementById("bundleStatus")
     if (bsSel) bsSel.value = "-"
+    /* Xóa triệt để dữ liệu kiện cũ: bag đối chiếu + trạng thái lookup (kẻo kiện mới bị mismatch giả / lookup bị skip) */
+    originalBag = null
+    originalKeys = null
+    originalTotalCount = 0
+    originalSoldCount = 0
+    lastLookupCode = ""
+    let lkEl = document.getElementById("bundleLookupStatus")
+    if (lkEl) lkEl.innerHTML = ""
+    let bagEl = document.getElementById("bundleBagStatus")
+    if (bagEl) bagEl.innerHTML = ""
+    hideQualitySuggest()
     renderWoodTypeDropdown()
     updateSummary()
     renderList()
     saveState()
     go("setup")
-    showToast("Đã lưu & reset", "success")
+    showToast(hadBoards ? "Đã lưu kiện cũ vào lịch sử — bắt đầu kiện mới" : "Đã xóa thông tin — bắt đầu kiện mới", "success")
 }
 function undo() { boards.pop(); updateSummary(); renderList(); saveState() }
 
