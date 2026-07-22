@@ -100,9 +100,11 @@
                     <label class="fieldLabel">Độ dày (cm)</label>
                     <input id="thickness" type="number" step="any">
                 </div>
-                <div>
+                <div style="position:relative">
                     <label class="fieldLabel">Chất lượng</label>
-                    <input id="quality" oninput="this.value=this.value.toUpperCase()">
+                    <input id="quality" autocomplete="off" oninput="onQualityInput(this)"
+                        onfocus="showQualitySuggest()">
+                    <div id="qualitySuggestList" class="woodSuggestList"></div>
                 </div>
             </div>
             <div class="toggleRow" style="margin-top:16px;justify-content:space-between">

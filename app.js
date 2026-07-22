@@ -380,10 +380,26 @@ async function verifySavedAccess() {
 /* WOOD TYPE PICKER — load danh sách gỗ từ DB */
 async function loadWoodTypes() {
     try {
-        let { data } = await sb.from("wood_types").select("id, name").order("name")
-        woodTypeList = (data || []).map(w => ({ id: w.id, name: w.name }))
+        let { data } = await sb.from("wood_types").select("id, name, product_form").order("name")
+        woodTypeList = (data || []).map(w => ({ id: w.id, name: w.name, productForm: w.product_form || "" }))
+        /* Cấu hình per-wood: chất lượng + loại gỗ có thuộc tính dong cạnh (NK cần dong) */
+        let { data: cfgRows } = await sb.from("wood_config")
+            .select("wood_id, attr_id, selected_values").in("attr_id", ["quality", "edging"])
+        edgingWoodSet = new Set()
+        qualityMap = {}
+        ;(cfgRows || []).forEach(r => {
+            if (r.attr_id === "edging") edgingWoodSet.add(r.wood_id)
+            if (r.attr_id === "quality") qualityMap[r.wood_id] = (r.selected_values || "").split(",").map(s => s.trim()).filter(Boolean)
+        })
         renderWoodTypeDropdown()
     } catch (e) { /* silent */ }
+}
+
+/* Kiện nguyên (mã mới nhập kho): chỉ cho gỗ xẻ sấy trong nước (processed)
+   + gỗ NK có cấu hình dong cạnh (tần bì NK, beech NK, sồi đỏ/trắng NK Âu).
+   Data-driven: thêm loại gỗ xẻ sấy mới / bật edging cho gỗ NK khác → tự xuất hiện. */
+function allowedWoodsForWhole() {
+    return woodTypeList.filter(w => w.productForm === "processed" || edgingWoodSet.has(w.id))
 }
 
 function renderWoodTypeDropdown() {
@@ -394,6 +410,11 @@ function selectWoodType(id, name) {
     selectedWoodId = id
     woodType.value = name.toUpperCase()
     hideWoodSuggest()
+    /* Kiện nguyên: đổi loại gỗ → chất lượng cũ không thuộc cấu hình loại mới thì xóa */
+    if (currentMeasurementType === "whole_bundle" && quality.value.trim()) {
+        let qList = qualityMap[id] || []
+        if (!qList.some(q => q.toLowerCase() === quality.value.trim().toLowerCase())) quality.value = ""
+    }
     saveState()
 }
 
@@ -411,7 +432,9 @@ function updateWoodSuggest(query) {
     if (!container) return
     container.innerHTML = ""
     let q = (query || "").toLowerCase().trim()
-    let filtered = q ? woodTypeList.filter(w => w.name.toLowerCase().includes(q) || w.id.toLowerCase().includes(q)) : woodTypeList
+    /* Kiện nguyên: chỉ hiện gỗ xẻ sấy + NK cần dong cạnh; Soạn lẻ: tất cả */
+    let base = currentMeasurementType === "whole_bundle" ? allowedWoodsForWhole() : woodTypeList
+    let filtered = q ? base.filter(w => w.name.toLowerCase().includes(q) || w.id.toLowerCase().includes(q)) : base
     if (!filtered.length) {
         container.classList.remove("open")
         return
@@ -432,10 +455,64 @@ function hideWoodSuggest() {
     if (container) container.classList.remove("open")
 }
 
+/* QUALITY PICKER — kiện nguyên: chọn từ chất lượng cấu hình theo loại gỗ */
+function onQualityInput(el) {
+    if (currentMeasurementType === "order_split") {
+        el.value = el.value.toUpperCase() // soạn lẻ: giữ hành vi cũ (gõ tay, viết hoa)
+        return
+    }
+    updateQualitySuggest(el.value)
+}
+
+function showQualitySuggest() {
+    if (currentMeasurementType !== "whole_bundle") return
+    updateQualitySuggest(quality.value)
+}
+
+function updateQualitySuggest(query) {
+    let container = document.getElementById("qualitySuggestList")
+    if (!container) return
+    container.innerHTML = ""
+    let qList = qualityMap[selectedWoodId] || []
+    if (!selectedWoodId || !qList.length) {
+        let hint = document.createElement("div")
+        hint.className = "woodSuggestItem"
+        hint.style.color = "#92400E"
+        hint.innerText = !selectedWoodId ? "Chọn loại gỗ trước" : "Loại gỗ chưa cấu hình chất lượng — báo admin"
+        container.appendChild(hint)
+        container.classList.add("open")
+        return
+    }
+    let q = (query || "").toLowerCase().trim()
+    let filtered = q ? qList.filter(v => v.toLowerCase().includes(q)) : qList
+    if (!filtered.length) filtered = qList // gõ lạ vẫn hiện đủ danh sách để chọn lại
+    filtered.forEach(v => {
+        let item = document.createElement("div")
+        item.className = "woodSuggestItem" + (quality.value.trim().toLowerCase() === v.toLowerCase() ? " active" : "")
+        item.innerText = v
+        item.onmousedown = function (e) { e.preventDefault() }
+        item.onclick = function () {
+            quality.value = v // giữ đúng case cấu hình ("Đẹp" không thành "ĐẸP") — khớp SKU
+            hideQualitySuggest()
+            saveState()
+        }
+        container.appendChild(item)
+    })
+    container.classList.add("open")
+}
+
+function hideQualitySuggest() {
+    let container = document.getElementById("qualitySuggestList")
+    if (container) container.classList.remove("open")
+}
+
 // Ẩn suggest khi blur (trừ khi click vào item)
 document.addEventListener("click", function (e) {
     if (!e.target.closest("#woodType") && !e.target.closest("#woodSuggestList")) {
         hideWoodSuggest()
+    }
+    if (!e.target.closest("#quality") && !e.target.closest("#qualitySuggestList")) {
+        hideQualitySuggest()
     }
 })
 
@@ -643,8 +720,10 @@ let widMax = 35
 let woodUS = false
 let currentSessionId = null
 const MAX_SAVED_LISTS = 30
-let woodTypeList = [] // [{id, name}] từ DB
+let woodTypeList = [] // [{id, name, productForm}] từ DB
 let selectedWoodId = "" // wood_id đã chọn
+let edgingWoodSet = new Set() // wood_id có cấu hình dong cạnh (NK cần dong)
+let qualityMap = {} // wood_id → [chất lượng cấu hình]
 
 /* LOCAL STORAGE */
 function saveState() {
@@ -942,6 +1021,32 @@ function startMeasure() {
         alert("Độ dày phải là số")
         thickness.focus()
         return
+    }
+    /* Kiện nguyên (mã mới nhập kho): chặn cứng loại gỗ + chất lượng theo cấu hình — tránh kiện lệch SKU */
+    if (currentMeasurementType === "whole_bundle") {
+        let allowed = allowedWoodsForWhole()
+        let w = allowed.find(x => x.id === selectedWoodId)
+        if (!w) {
+            /* Gõ tay đúng tên đầy đủ mà chưa click chọn → tự khớp */
+            let typed = woodType.value.trim().toLowerCase()
+            w = allowed.find(x => x.name.toLowerCase() === typed)
+            if (w) selectedWoodId = w.id
+        }
+        if (!w) {
+            if (!woodTypeList.length) { alert("Chưa tải được danh sách loại gỗ — kiểm tra mạng rồi thử lại"); return }
+            alert("Kiện nguyên: chọn loại gỗ trong danh sách\n(gỗ xẻ sấy trong nước hoặc gỗ NK cần dong cạnh)")
+            woodType.focus()
+            return
+        }
+        let qList = qualityMap[selectedWoodId] || []
+        let qNorm = qList.find(v => v.toLowerCase() === quality.value.trim().toLowerCase())
+        if (!qNorm) {
+            alert("Chất lượng phải chọn theo cấu hình " + w.name + ":\n" + (qList.join(", ") || "(loại gỗ chưa cấu hình chất lượng — báo admin)"))
+            quality.focus()
+            showQualitySuggest()
+            return
+        }
+        quality.value = qNorm // chuẩn hóa đúng case cấu hình ("Đẹp", không phải "ĐẸP") — khớp SKU
     }
     if (!currentSessionId) currentSessionId = Date.now()
     updateHeader()
