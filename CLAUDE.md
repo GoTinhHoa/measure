@@ -37,6 +37,8 @@ Xác thực bằng bảng `measure_devices` (`code`, `user_name`, `default_type`
 ### Sync
 `syncToSystem()` upsert `bundle_measurements` theo `session_id` (unique per kiện, reset khi "Kiện mới"): order_split → PgSales "DS kiện lẻ vừa soạn"; whole_bundle → PgKiln "mẻ xếp". Ghi lịch sử đăng nhập `device_login_history`.
 
+**Guard chống ghi đè phiếu đã gán (26/07/2026)**: trước khi upsert, `syncToSystem` SELECT phiếu theo `session_id` — nếu phiếu đã `status='đã gán'` hoặc `deleted=true` thì TỪ CHỐI sync (toast báo lý do), không ghi đè. Bug cũ (ca kiện A2037 25/07): chia sẻ lại phiên cũ upsert ép status về "chờ gán" → phiếu đã bán quay lại pool chờ gán của PgSales, không hoàn kho, gây nguy cơ bán trùng. KHÔNG bỏ guard này khi sửa syncToSystem.
+
 ## Tính thể tích
 
 `calcVolumeFromBoards`: group theo dài, ROUNDDOWN từng nhóm, cộng, /10000 — khớp Excel "Lý lịch gỗ" cũ. Gỗ Mỹ (toggle `woodUS`): dải dài 22–25 dm, rộng 15–25 cm.

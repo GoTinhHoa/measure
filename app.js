@@ -542,6 +542,21 @@ async function syncToSystem() {
     if (!currentUser) return { ok: false, reason: "Chưa đăng nhập (thiếu tên người đo)" }
     if (!currentSessionId || boards.length === 0) return { ok: false, reason: "Chưa có dữ liệu để đồng bộ" }
     try {
+        // Phiếu đã gán vào đơn / đã bị vô hiệu thì KHÔNG được ghi đè — bug A2037 25/07/2026:
+        // chia sẻ lại phiên cũ upsert ép status về "chờ gán" → phiếu đã bán quay lại pool
+        // chờ gán (không hoàn kho, không dấu vết) → nguy cơ gán bán lần 2
+        let { data: existing, error: exErr } = await sb.from("bundle_measurements")
+            .select("id, status, deleted, order_id").eq("session_id", currentSessionId).maybeSingle()
+        if (exErr) return { ok: false, reason: exErr.message }
+        if (existing) {
+            if (existing.status !== "chờ gán") {
+                return { ok: false, reason: 'Phiếu này đã được gán vào đơn hàng — không thể gửi lại. Bấm "Kiện mới" để đo phiếu khác' }
+            }
+            if (existing.deleted && existing.order_id) {
+                return { ok: false, reason: 'Phiếu này đã bị vô hiệu trên hệ thống — bấm "Kiện mới" để đo phiếu khác' }
+            }
+            // Phiếu "chờ gán" chưa dính đơn (kể cả bị xóa nhầm khỏi pool) → cho gửi lại bình thường
+        }
         // session_id unique per kiện (tạo 1 lần khi startMeasure, reset khi "Kiện mới")
         // Cùng session chia sẻ lại → upsert update (cập nhật số tấm/khối lượng)
         // Khác session cùng mã kiện → tạo record mới (soạn lẻ cho khách khác)
