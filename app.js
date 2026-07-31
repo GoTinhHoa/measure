@@ -686,6 +686,44 @@ function renderBagStatus() {
     }
 }
 
+/* ===== FB-0012: cảnh báo "Lẻ hết" khi kho vẫn còn tấm ===== */
+// leHetOkCount = boards.length tại lúc "Lẻ hết" được xác nhận/kiểm tra hợp lệ. Khớp số tấm hiện
+// tại thì khỏi hỏi lại; số tấm đổi (thêm/bớt) → không khớp → hỏi lại ở lưới an toàn lúc Chia sẻ.
+let leHetOkCount = -1
+
+// Tồn kho gốc CÒN LẠI sau khi trừ số tấm đang soạn. Trả số (>0 = còn tấm) hoặc null (không rõ tồn).
+// Chưa nạp list gốc (F5 / mở từ Lịch sử) → nạp lại loadOriginalBag theo mã kiện đang nhập.
+async function leHetRemainingAfter() {
+    if (originalTotalCount === 0) {
+        let el = document.getElementById("bundle")
+        let code = el ? el.value.trim() : ""
+        if (code) { try { await loadOriginalBag(code) } catch (e) { } }
+    }
+    if (originalTotalCount === 0) return null
+    return (originalTotalCount - originalSoldCount) - boards.length
+}
+
+// Chọn ô tình trạng kiện (chỉ order_split). "Lẻ hết" mà kho còn tấm → cảnh báo ngay tại chỗ.
+// Tạm lùi ô về "Kiện lẻ" (an toàn) rồi hỏi; Xác nhận mới đặt lại "Lẻ hết" (Hủy → giữ "Kiện lẻ").
+async function onBundleStatusChange() {
+    let sel = document.getElementById("bundleStatus")
+    if (!sel) return
+    if (currentMeasurementType !== "order_split" || sel.value !== "Lẻ hết") { saveState(); return }
+    let remain = await leHetRemainingAfter()
+    if (remain !== null && remain > 0) {
+        sel.value = "Kiện lẻ"
+        saveState()
+        showConfirm(
+            "Kiểm tra 'Lẻ hết'",
+            "Sau khi trừ " + boards.length + " tấm vừa soạn, kho vẫn còn " + remain + " tấm. Nếu kiện đã hết thật, bấm Xác nhận để đặt 'Lẻ hết'. Nếu bấm nhầm, bấm Hủy để giữ 'Kiện lẻ'.",
+            function () { sel.value = "Lẻ hết"; leHetOkCount = boards.length; saveState() }
+        )
+    } else {
+        leHetOkCount = boards.length
+        saveState()
+    }
+}
+
 /* LOOKUP mã kiện NCC → auto-fill loại gỗ, dày, chất lượng */
 let lastLookupCode = ""
 async function lookupBundle() {
@@ -1537,6 +1575,20 @@ async function shareMatrixZalo() {
             bs.focus()
             if (navigator.vibrate) navigator.vibrate(200)
             return
+        }
+        // Lưới an toàn (FB-0012): vẫn "Lẻ hết" mà kho còn tấm & số tấm đã đổi so với lúc xác nhận
+        // (VD sửa số tấm sau khi chọn "Lẻ hết") → cảnh báo, dừng chia sẻ; xác nhận rồi Chia sẻ lại.
+        if (bs && bs.value === "Lẻ hết" && leHetOkCount !== boards.length) {
+            let remain = await leHetRemainingAfter()
+            if (remain !== null && remain > 0) {
+                showConfirm(
+                    "Kiểm tra 'Lẻ hết'",
+                    "Kho vẫn còn " + remain + " tấm sau khi trừ " + boards.length + " tấm vừa soạn. Nếu hết thật, bấm Xác nhận rồi bấm Chia sẻ lại. Nếu nhầm, bấm Hủy rồi đổi ô tình trạng về 'Kiện lẻ'.",
+                    function () { leHetOkCount = boards.length; showToast("Đã xác nhận 'Lẻ hết' — bấm Chia sẻ lại", "success") }
+                )
+                return
+            }
+            leHetOkCount = boards.length
         }
     }
 
