@@ -1,2 +1,2 @@
 /* Phiên bản app — sửa 1 chỗ duy nhất, cả service worker + app cùng đọc */
-const APP_VERSION = "v23"
+const APP_VERSION = "v24"

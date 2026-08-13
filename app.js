@@ -1029,7 +1029,19 @@ function go(screen) {
    nhịp nhanh rate 1.3 của bản cũ). Bộ từ chỉ cần 14 mẩu vì app đọc tắt: 27 = "hai bảy". */
 const VOICE_DIGITS = ["khong", "mot", "hai", "ba", "bon", "nam", "sau", "bay", "tam", "chin"]
 const VOICE_WORDS = VOICE_DIGITS.concat(["muoi", "muoi2", "mot2", "phay"])
-const VOICE_LEVELS = { vua: { drive: 0, gain: 1.5 }, to: { drive: 4, gain: 1.03 }, ratto: { drive: 8, gain: 1 } }
+/* Mức tiếng. LƯU Ý (13-08-2026): bản đầu dùng "cắt mềm" (WaveShaper tanh) để đẩy âm lượng —
+   hợp với tiếng bíp nhưng làm GIỌNG NÓI bị vuông hoá → thợ báo rè, vỡ tiếng. Đo được tỷ lệ
+   đỉnh/trung bình rơi từ 5,2 (giọng tự nhiên) xuống 1,79 (gần sóng vuông). ĐỪNG dùng lại tanh
+   cho giọng.
+   Cách hiện tại: cân mức từng mẩu → cắt bass (không giúp nghe rõ mà ngốn biên độ) → nhấn dải
+   2,6kHz (dải quyết định nghe rõ giữa tiếng máy) → nén nhẹ → chặn đỉnh → hệ số an toàn dò sẵn
+   cho đỉnh ≤ 0,92. Đo: to hơn ~6dB, riêng dải giọng rõ hơn ~3,8dB, tỷ lệ đỉnh/trung bình giữ
+   >3,1 nên không rè. */
+const VOICE_LEVELS = {
+    vua: { hp: 140, presence: 6, th: -20, ratio: 4, makeup: 1.8, safe: 0.50 },
+    to: { hp: 140, presence: 6, th: -20, ratio: 4, makeup: 1.8, safe: 0.874 },
+    ratto: { hp: 120, presence: 3, th: -24, ratio: 6, makeup: 2.2, safe: 0.859 }
+}
 let voiceLevel = localStorage.getItem("woodMeasureVoiceLevel") || "to"
 let audioCtx = null
 let voiceBuffers = {}   // tên mẩu → { buffer, offset, dur } (đã cắt khoảng lặng)
@@ -1056,7 +1068,9 @@ function trimSilence(buf) {
     const pad = Math.round(buf.sampleRate * 0.02)
     const off = Math.max(0, s - pad)
     const end = Math.min(d.length - 1, e + pad)
-    return { buffer: buf, offset: off / buf.sampleRate, dur: Math.max(0.05, (end - off) / buf.sampleRate) }
+    let peak = 0
+    for (let i = s; i <= e; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a }
+    return { buffer: buf, offset: off / buf.sampleRate, dur: Math.max(0.05, (end - off) / buf.sampleRate), peak }
 }
 
 function loadVoicePack() {
@@ -1072,17 +1086,29 @@ function loadVoicePack() {
     return voiceLoading
 }
 
-// Cắt mềm (tanh): san đỉnh để đẩy được âm lượng lên mà không rè gắt
-function makeVoiceShaper(ctx, drive) {
-    const ws = ctx.createWaveShaper()
-    const n = 1024, curve = new Float32Array(n), k = Math.max(0.001, drive)
-    for (let i = 0; i < n; i++) {
-        const x = (i / (n - 1)) * 2 - 1
-        curve[i] = drive > 0 ? Math.tanh(k * x) / Math.tanh(k) : x
+// Dựng chuỗi xử lý tiếng, trả về node đầu vào. Tách riêng để test được bằng OfflineAudioContext.
+function buildVoiceChain(ctx, lv) {
+    const hp = ctx.createBiquadFilter()
+    hp.type = "highpass"; hp.frequency.value = lv.hp; hp.Q.value = 0.7
+    let node = hp
+    if (lv.presence) {
+        const pk = ctx.createBiquadFilter()
+        pk.type = "peaking"; pk.frequency.value = 2600; pk.Q.value = 1.0; pk.gain.value = lv.presence
+        node.connect(pk); node = pk
     }
-    ws.curve = curve
-    ws.oversample = "2x"
-    return ws
+    const comp = ctx.createDynamicsCompressor()
+    comp.threshold.value = lv.th; comp.ratio.value = lv.ratio
+    comp.knee.value = 12; comp.attack.value = 0.005; comp.release.value = 0.15
+    node.connect(comp); node = comp
+    const mk = ctx.createGain(); mk.gain.value = lv.makeup
+    node.connect(mk); node = mk
+    const lim = ctx.createDynamicsCompressor()   // chặn đỉnh, không cho vượt trần loa
+    lim.threshold.value = -4; lim.ratio.value = 20
+    lim.knee.value = 0; lim.attack.value = 0.0005; lim.release.value = 0.06
+    node.connect(lim); node = lim
+    const safe = ctx.createGain(); safe.gain.value = lv.safe
+    node.connect(safe); safe.connect(ctx.destination)
+    return hp
 }
 
 // Số → danh sách mẩu tiếng. Giữ NGUYÊN cách đọc tắt của bản cũ (27 = "hai bảy", 21 = "hai mốt")
@@ -1108,20 +1134,16 @@ function playVoiceTokens(tokens) {
     if (!ctx || ctx.state !== "running") return false
     if (tokens.some(t => !voiceBuffers[t])) return false
     const lv = VOICE_LEVELS[voiceLevel] || VOICE_LEVELS.to
-    const pre = ctx.createGain()
-    pre.gain.value = lv.drive > 0 ? 2.5 : 1
-    const shaper = makeVoiceShaper(ctx, lv.drive)
-    const comp = ctx.createDynamicsCompressor()
-    comp.threshold.value = -18; comp.ratio.value = 12; comp.attack.value = 0.002; comp.release.value = 0.08
-    const post = ctx.createGain()
-    post.gain.value = lv.gain
-    pre.connect(shaper); shaper.connect(comp); comp.connect(post); post.connect(ctx.destination)
+    const input = buildVoiceChain(ctx, lv)
     let t = ctx.currentTime + 0.02
     tokens.forEach(tk => {
         const v = voiceBuffers[tk]
         const src = ctx.createBufferSource()
         src.buffer = v.buffer
-        src.connect(pre)
+        // cân mức từng mẩu về cùng độ to (file gốc chênh nhau) — tăng được ~6dB mà không méo
+        const norm = ctx.createGain()
+        norm.gain.value = Math.min(4, 0.9 / (v.peak || 0.5))
+        src.connect(norm); norm.connect(input)
         src.start(t, v.offset, v.dur)
         t += v.dur - 0.03   // chồng nhẹ cho liền mạch, khỏi nghe rời rạc
     })

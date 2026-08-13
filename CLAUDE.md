@@ -45,10 +45,19 @@ Bấm nút chọn Dài/Rộng thì app đọc số lên cho thợ khỏi phải 
 của hệ điều hành nghe không rõ, mà **không khuếch đại được**: Web Speech không cho lấy luồng
 tiếng ra xử lý, `utterance.volume` tối đa 1 và mặc định đã là 1.
 
-→ App phát **bộ giọng thu sẵn** `voice/*.mp3` qua Web Audio rồi tự khuếch đại:
-`gain → cắt mềm tanh (WaveShaper) → nén động → gain bù`. Đo được **+12,2 dB (≈ to gấp 2,3 lần)**
-ở mức "To" mà đỉnh vẫn 0,95 (chưa vỡ tiếng). Ba mức Vừa / To / Rất to ở màn Setup, mặc định
-**To**, nhớ trong `localStorage.woodMeasureVoiceLevel`, bấm là nghe thử ngay.
+→ App phát **bộ giọng thu sẵn** `voice/*.mp3` qua Web Audio rồi tự khuếch đại (`buildVoiceChain`):
+**cân mức từng mẩu → cắt bass (highpass) → nhấn dải 2,6kHz → nén nhẹ → chặn đỉnh → hệ số an toàn**.
+Đo: to hơn **~6 dB (≈ gấp 2 lần)**, riêng dải giọng 1-5kHz rõ hơn **~3,8 dB**, đỉnh 0,92 và
+tỷ lệ đỉnh/trung bình giữ 3,2-3,5. Ba mức Vừa / To / Rất to ở màn Setup, mặc định **To**, nhớ
+trong `localStorage.woodMeasureVoiceLevel`, bấm là nghe thử ngay.
+
+⚠️ **ĐỪNG dùng lại "cắt mềm" (WaveShaper tanh) cho giọng nói** — bản v23 làm vậy, đo ra +12,2 dB
+nghe có vẻ hơn nhưng thợ báo **rè, vỡ tiếng**: tanh bóp sóng thành gần vuông, tỷ lệ đỉnh/trung
+bình rơi từ 5,2 (giọng tự nhiên) xuống 1,79. Với tiếng bíp bên GTH Pricing thì tanh không sao
+(bản thân nó đã là sóng vuông), nhưng giọng người thì hỏng. Trần thật của cách sạch tiếng là
+khoảng +6 dB — muốn to hơn nữa phải dùng loa ngoài, không phải chỉnh phần mềm.
+Kiểm chứng nhanh khi sửa: render `buildVoiceChain` bằng OfflineAudioContext, yêu cầu **đỉnh ≤ 0,93
+và tỷ lệ đỉnh/trung bình ≥ 3**.
 
 - **Chỉ 14 mẩu** (`khong…chin`, `muoi`, `muoi2`=mươi, `mot2`=mốt, `phay`) vì app đọc tắt kiểu
   thợ: 27 = "hai bảy", 21 = "hai mốt", 20 = "hai mươi". `numberToVoiceTokens()` giữ **nguyên**
