@@ -1020,39 +1020,144 @@ function go(screen) {
     document.getElementById(screen).classList.add("active")
 }
 
-/* SPEAK */
-function speakNumber(n) {
+/* ============ ĐỌC SỐ ============
+   Xưởng ồn nên giọng đọc của hệ điều hành nghe không rõ: trình duyệt không cho lấy luồng
+   tiếng đó ra để khuếch đại (volume tối đa = 1, mặc định đã là 1). Vì vậy app phát bằng
+   BỘ GIỌNG THU SẴN trong thư mục voice/ rồi tự khuếch đại — đo được to hơn ~12dB (≈2,3 lần)
+   mà chưa vỡ tiếng. Máy chưa tải được file thì lui về giọng hệ điều hành như cũ.
+   File thu bằng giọng nam miền Bắc (Microsoft vi-VN-NamMinhNeural, tốc độ +30% để giữ đúng
+   nhịp nhanh rate 1.3 của bản cũ). Bộ từ chỉ cần 14 mẩu vì app đọc tắt: 27 = "hai bảy". */
+const VOICE_DIGITS = ["khong", "mot", "hai", "ba", "bon", "nam", "sau", "bay", "tam", "chin"]
+const VOICE_WORDS = VOICE_DIGITS.concat(["muoi", "muoi2", "mot2", "phay"])
+const VOICE_LEVELS = { vua: { drive: 0, gain: 1.5 }, to: { drive: 4, gain: 1.03 }, ratto: { drive: 8, gain: 1 } }
+let voiceLevel = localStorage.getItem("woodMeasureVoiceLevel") || "to"
+let audioCtx = null
+let voiceBuffers = {}   // tên mẩu → { buffer, offset, dur } (đã cắt khoảng lặng)
+let voiceLoading = null
+
+function ensureAudioCtx() {
+    // iOS chỉ cho tạo/mở khoá âm thanh trong lúc người dùng chạm màn hình
+    try {
+        const AC = window.AudioContext || window.webkitAudioContext
+        if (!AC) return null
+        if (!audioCtx) audioCtx = new AC()
+        if (audioCtx.state === "suspended") audioCtx.resume().catch(() => { })
+        return audioCtx
+    } catch (e) { return null }
+}
+
+// Bỏ khoảng lặng đầu/cuối của mỗi mẩu — file gốc dài 1,8s mà tiếng nói chỉ ~0,2s,
+// không cắt thì đọc "hai bảy" mất mấy giây.
+function trimSilence(buf) {
+    const d = buf.getChannelData(0), TH = 0.008
+    let s = 0, e = d.length - 1
+    while (s < d.length && Math.abs(d[s]) < TH) s++
+    while (e > s && Math.abs(d[e]) < TH) e--
+    const pad = Math.round(buf.sampleRate * 0.02)
+    const off = Math.max(0, s - pad)
+    const end = Math.min(d.length - 1, e + pad)
+    return { buffer: buf, offset: off / buf.sampleRate, dur: Math.max(0.05, (end - off) / buf.sampleRate) }
+}
+
+function loadVoicePack() {
+    if (voiceLoading) return voiceLoading
+    const ctx = ensureAudioCtx()
+    if (!ctx) return Promise.reject(new Error("no-audio"))
+    voiceLoading = Promise.all(VOICE_WORDS.map(w =>
+        fetch("voice/" + w + ".mp3")
+            .then(r => r.arrayBuffer())
+            .then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej)))
+            .then(buf => { voiceBuffers[w] = trimSilence(buf) })
+    )).catch(e => { voiceLoading = null; throw e })
+    return voiceLoading
+}
+
+// Cắt mềm (tanh): san đỉnh để đẩy được âm lượng lên mà không rè gắt
+function makeVoiceShaper(ctx, drive) {
+    const ws = ctx.createWaveShaper()
+    const n = 1024, curve = new Float32Array(n), k = Math.max(0.001, drive)
+    for (let i = 0; i < n; i++) {
+        const x = (i / (n - 1)) * 2 - 1
+        curve[i] = drive > 0 ? Math.tanh(k * x) / Math.tanh(k) : x
+    }
+    ws.curve = curve
+    ws.oversample = "2x"
+    return ws
+}
+
+// Số → danh sách mẩu tiếng. Giữ NGUYÊN cách đọc tắt của bản cũ (27 = "hai bảy", 21 = "hai mốt")
+function numberToVoiceTokens(n) {
+    const intTokens = (num) => {
+        if (num < 10) return [VOICE_DIGITS[num]]
+        if (num === 10) return ["muoi"]
+        if (num < 20) return ["muoi", VOICE_DIGITS[num % 10]]
+        const tens = Math.floor(num / 10), unit = num % 10
+        if (unit === 0) return [VOICE_DIGITS[tens], "muoi2"]
+        if (unit === 1) return [VOICE_DIGITS[tens], "mot2"]
+        return [VOICE_DIGITS[tens], VOICE_DIGITS[unit]]
+    }
+    const s = n.toString()
+    if (!s.includes(".")) return intTokens(parseInt(s))
+    const parts = s.split(".")
+    return intTokens(parseInt(parts[0]))
+        .concat(["phay"], parts[1].split("").map(d => VOICE_DIGITS[+d]))
+}
+
+function playVoiceTokens(tokens) {
+    const ctx = ensureAudioCtx()
+    if (!ctx || ctx.state !== "running") return false
+    if (tokens.some(t => !voiceBuffers[t])) return false
+    const lv = VOICE_LEVELS[voiceLevel] || VOICE_LEVELS.to
+    const pre = ctx.createGain()
+    pre.gain.value = lv.drive > 0 ? 2.5 : 1
+    const shaper = makeVoiceShaper(ctx, lv.drive)
+    const comp = ctx.createDynamicsCompressor()
+    comp.threshold.value = -18; comp.ratio.value = 12; comp.attack.value = 0.002; comp.release.value = 0.08
+    const post = ctx.createGain()
+    post.gain.value = lv.gain
+    pre.connect(shaper); shaper.connect(comp); comp.connect(post); post.connect(ctx.destination)
+    let t = ctx.currentTime + 0.02
+    tokens.forEach(tk => {
+        const v = voiceBuffers[tk]
+        const src = ctx.createBufferSource()
+        src.buffer = v.buffer
+        src.connect(pre)
+        src.start(t, v.offset, v.dur)
+        t += v.dur - 0.03   // chồng nhẹ cho liền mạch, khỏi nghe rời rạc
+    })
+    return true
+}
+
+function speakSystem(n) {   // đường lui: giọng của hệ điều hành (như bản cũ)
     if (!window.speechSynthesis) return
     speechSynthesis.cancel()
-    const digits = [
-        "không", "một", "hai", "ba", "bốn",
-        "năm", "sáu", "bảy", "tám", "chín"
-    ]
-    function readInt(num) {
-        if (num < 10) return digits[num]
-        if (num == 10) return "mười"
-        if (num < 20) {
-            return "mười " + digits[num % 10]
-        }
-        let tens = Math.floor(num / 10)
-        let unit = num % 10
-        if (unit == 0) return digits[tens] + " mươi"
-        if (unit == 1) return digits[tens] + " mốt"
-        return digits[tens] + " " + digits[unit]
-    }
-    let text = ""
-    let s = n.toString()
-    if (s.includes(".")) {
-        let parts = s.split(".")
-        text = readInt(parseInt(parts[0])) + " phẩy " +
-            parts[1].split("").map(d => digits[d]).join(" ")
-    } else {
-        text = readInt(parseInt(s))
-    }
-    let utter = new SpeechSynthesisUtterance(text)
+    const digits = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"]
+    const map = { khong: "không", mot: "một", hai: "hai", ba: "ba", bon: "bốn", nam: "năm", sau: "sáu", bay: "bảy", tam: "tám", chin: "chín", muoi: "mười", muoi2: "mươi", mot2: "mốt", phay: "phẩy" }
+    void digits
+    const text = numberToVoiceTokens(n).map(t => map[t]).join(" ")
+    const utter = new SpeechSynthesisUtterance(text)
     utter.lang = "vi-VN"
     utter.rate = 1.3
+    utter.volume = 1
     speechSynthesis.speak(utter)
+}
+
+function speakNumber(n) {
+    const tokens = numberToVoiceTokens(n)
+    if (playVoiceTokens(tokens)) return
+    // chưa tải xong bộ giọng → đọc tạm bằng giọng máy, đồng thời tải nền cho lần sau
+    speakSystem(n)
+    loadVoicePack().catch(() => { })
+}
+
+function setVoiceLevel(lv) {
+    voiceLevel = lv
+    localStorage.setItem("woodMeasureVoiceLevel", lv)
+    document.querySelectorAll("#voiceLevelRow button[data-lv]").forEach(b => {
+        b.classList.toggle("selected", b.dataset.lv === lv)
+    })
+    ensureAudioCtx()
+    loadVoicePack().then(() => speakNumber(27.5)).catch(() => speakSystem(27.5))
 }
 
 /* GRID */
@@ -1078,6 +1183,10 @@ function toggleWoodUS() {
 
 /* START */
 async function startMeasure() {
+    // Bấm nút này là thao tác tay → tranh thủ mở khoá âm thanh (iOS bắt buộc) và nạp bộ giọng
+    // trước khi vào màn đo, để lần bấm số đầu tiên đã đọc bằng giọng thu sẵn.
+    ensureAudioCtx()
+    loadVoicePack().catch(() => { })
     if (bundle.value.trim() == "") {
         alert("Vui lòng nhập mã kiện")
         bundle.focus()
@@ -1682,6 +1791,10 @@ window.addEventListener("load", async function () {
     rebuild()
     updateSummary()
     renderList()
+    // đánh dấu mức tiếng đang chọn (chỉ tô nút, không phát thử lúc mở app)
+    document.querySelectorAll("#voiceLevelRow button[data-lv]").forEach(b => {
+        b.classList.toggle("selected", b.dataset.lv === voiceLevel)
+    })
     /* Nếu đang có session → lưu & vào Measure */
     if (boards.length > 0 && bundle.value.trim() !== "") {
         saveCurrentSession()
