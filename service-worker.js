@@ -6,12 +6,7 @@ const urlsToCache = [
     "./index.html",
     "./style.css",
     "./app.js",
-    "./version.js",
-    // Bộ giọng đọc số (14 mẩu, ~168KB) — cache để đọc được cả khi kho mất sóng
-    "./voice/khong.mp3", "./voice/mot.mp3", "./voice/hai.mp3", "./voice/ba.mp3",
-    "./voice/bon.mp3", "./voice/nam.mp3", "./voice/sau.mp3", "./voice/bay.mp3",
-    "./voice/tam.mp3", "./voice/chin.mp3", "./voice/muoi.mp3", "./voice/muoi2.mp3",
-    "./voice/mot2.mp3", "./voice/phay.mp3"
+    "./version.js"
 ];
 
 // Cài đặt: cache các file cần thiết

@@ -39,41 +39,26 @@ Xác thực bằng bảng `measure_devices` (`code`, `user_name`, `default_type`
 
 **Guard chống ghi đè phiếu đã gán (26/07/2026)**: trước khi upsert, `syncToSystem` SELECT phiếu theo `session_id` — nếu phiếu đã `status='đã gán'` hoặc `deleted=true` thì TỪ CHỐI sync (toast báo lý do), không ghi đè. Bug cũ (ca kiện A2037 25/07): chia sẻ lại phiên cũ upsert ép status về "chờ gán" → phiếu đã bán quay lại pool chờ gán của PgSales, không hoàn kho, gây nguy cơ bán trùng. KHÔNG bỏ guard này khi sửa syncToSystem.
 
-## Đọc số bằng giọng thu sẵn (v23, 13-08-2026)
+## Đọc số khi chọn Dài/Rộng — đã thử giọng thu sẵn rồi BỎ (13-08-2026)
 
-Bấm nút chọn Dài/Rộng thì app đọc số lên cho thợ khỏi phải nhìn màn hình. Xưởng ồn nên giọng
-của hệ điều hành nghe không rõ, mà **không khuếch đại được**: Web Speech không cho lấy luồng
-tiếng ra xử lý, `utterance.volume` tối đa 1 và mặc định đã là 1.
+`speakNumber()` dùng giọng của hệ điều hành (Web Speech), `rate 1.3`. **Tốc độ 1.3 là cố ý** —
+giọng mặc định đọc quá chậm, thợ chờ lâu. Đừng "sửa" cho chậm lại.
 
-→ App phát **bộ giọng thu sẵn** `voice/*.mp3` qua Web Audio rồi tự khuếch đại (`buildVoiceChain`):
-**cân mức từng mẩu → cắt bass (highpass) → nhấn dải 2,6kHz → nén nhẹ → chặn đỉnh → hệ số an toàn**.
-Đo: to hơn **~6 dB (≈ gấp 2 lần)**, riêng dải giọng 1-5kHz rõ hơn **~3,8 dB**, đỉnh 0,92 và
-tỷ lệ đỉnh/trung bình giữ 3,2-3,5. Ba mức Vừa / To / Rất to ở màn Setup, mặc định **To**, nhớ
-trong `localStorage.woodMeasureVoiceLevel`, bấm là nghe thử ngay.
+Thợ báo tiếng nhỏ so với xưởng ồn. Đã thử nâng ở v23/v24 rồi **quay lại v22 theo yêu cầu**:
 
-⚠️ **ĐỪNG dùng lại "cắt mềm" (WaveShaper tanh) cho giọng nói** — bản v23 làm vậy, đo ra +12,2 dB
-nghe có vẻ hơn nhưng thợ báo **rè, vỡ tiếng**: tanh bóp sóng thành gần vuông, tỷ lệ đỉnh/trung
-bình rơi từ 5,2 (giọng tự nhiên) xuống 1,79. Với tiếng bíp bên GTH Pricing thì tanh không sao
-(bản thân nó đã là sóng vuông), nhưng giọng người thì hỏng. Trần thật của cách sạch tiếng là
-khoảng +6 dB — muốn to hơn nữa phải dùng loa ngoài, không phải chỉnh phần mềm.
-Kiểm chứng nhanh khi sửa: render `buildVoiceChain` bằng OfflineAudioContext, yêu cầu **đỉnh ≤ 0,93
-và tỷ lệ đỉnh/trung bình ≥ 3**.
+- Giọng hệ điều hành **không khuếch đại được**: Web Speech không cho lấy luồng tiếng ra xử lý,
+  `utterance.volume` tối đa 1 và mặc định đã là 1 → bản hiện tại đang chạy hết cỡ rồi.
+- v23 thay bằng **bộ giọng thu sẵn** (14 mẩu MP3 do `edge-tts` giọng vi-VN-NamMinhNeural tạo,
+  ghép theo cách đọc tắt "27 = hai bảy") rồi khuếch đại bằng WaveShaper tanh. Đo +12,2 dB nhưng
+  thợ báo **rè, vỡ tiếng**: tanh bóp giọng thành gần sóng vuông, tỷ lệ đỉnh/trung bình rơi từ
+  5,2 xuống 1,79. ⚠️ **Cắt mềm (tanh) hợp tiếng bíp, KHÔNG hợp giọng người.**
+- v24 sửa sạch tiếng (cân mức từng mẩu → cắt bass → nhấn 2,6kHz → nén nhẹ → chặn đỉnh) nhưng
+  trần chỉ còn **~+6 dB**, và user chọn quay về v22.
 
-- **Chỉ 14 mẩu** (`khong…chin`, `muoi`, `muoi2`=mươi, `mot2`=mốt, `phay`) vì app đọc tắt kiểu
-  thợ: 27 = "hai bảy", 21 = "hai mốt", 20 = "hai mươi". `numberToVoiceTokens()` giữ **nguyên**
-  cách đọc này của bản cũ — đổi là thợ nghe lạ tai.
-- File tạo bằng `edge-tts` giọng **vi-VN-NamMinhNeural** (nam miền Bắc), `--rate=+30%` để khớp
-  nhịp nhanh `rate 1.3` của bản cũ (tốc độ này là **cố ý**, giọng mặc định đọc quá chậm).
-  Sinh lại: `python -m edge_tts --voice vi-VN-NamMinhNeural --rate=+30% --text "hai" --write-media voice/hai.mp3`
-  (thỉnh thoảng trả file 0 byte — phải kiểm tra kích thước và sinh lại).
-- File gốc dài 1,78s mà tiếng nói chỉ ~0,2s → `trimSilence()` **cắt khoảng lặng lúc chạy**
-  (không cắt thì đọc "hai bảy" mất mấy giây). Đọc "27" hết 0,43s, "27,5" hết 0,97s.
-- `speakNumber` **lui về giọng hệ điều hành** (`speakSystem`) khi chưa tải xong bộ giọng — đã
-  test: thiếu file thì vẫn đọc, không câm.
-- `ensureAudioCtx()` phải gọi trong lúc người dùng chạm (iOS chặn tạo AudioContext chỗ khác) —
-  đang gọi ở `startMeasure()` và khi bấm nút chọn mức tiếng.
-- ⚠️ Thêm/bớt file trong `voice/` phải cập nhật `urlsToCache` của service-worker (kho hay mất sóng).
-- ⚠️ iPhone gạt công tắc im lặng thì **không kêu** — luật iOS, không lách được bằng web.
+**Kết luận cho lần sau**: muốn to hơn nữa thì giới hạn nằm ở loa điện thoại, không phải phần mềm
+— dùng loa Bluetooth mini đeo người. Nếu vẫn muốn làm lại đường giọng thu sẵn, xem commit
+`886f681` (v23) và `21ba0fa` (v24) để lấy code + tham số đã đo, và bắt buộc kiểm chứng bằng
+OfflineAudioContext: **đỉnh ≤ 0,93 và tỷ lệ đỉnh/trung bình ≥ 3** thì mới không rè.
 
 ## Tính thể tích
 

@@ -1020,166 +1020,39 @@ function go(screen) {
     document.getElementById(screen).classList.add("active")
 }
 
-/* ============ ĐỌC SỐ ============
-   Xưởng ồn nên giọng đọc của hệ điều hành nghe không rõ: trình duyệt không cho lấy luồng
-   tiếng đó ra để khuếch đại (volume tối đa = 1, mặc định đã là 1). Vì vậy app phát bằng
-   BỘ GIỌNG THU SẴN trong thư mục voice/ rồi tự khuếch đại — đo được to hơn ~12dB (≈2,3 lần)
-   mà chưa vỡ tiếng. Máy chưa tải được file thì lui về giọng hệ điều hành như cũ.
-   File thu bằng giọng nam miền Bắc (Microsoft vi-VN-NamMinhNeural, tốc độ +30% để giữ đúng
-   nhịp nhanh rate 1.3 của bản cũ). Bộ từ chỉ cần 14 mẩu vì app đọc tắt: 27 = "hai bảy". */
-const VOICE_DIGITS = ["khong", "mot", "hai", "ba", "bon", "nam", "sau", "bay", "tam", "chin"]
-const VOICE_WORDS = VOICE_DIGITS.concat(["muoi", "muoi2", "mot2", "phay"])
-/* Mức tiếng. LƯU Ý (13-08-2026): bản đầu dùng "cắt mềm" (WaveShaper tanh) để đẩy âm lượng —
-   hợp với tiếng bíp nhưng làm GIỌNG NÓI bị vuông hoá → thợ báo rè, vỡ tiếng. Đo được tỷ lệ
-   đỉnh/trung bình rơi từ 5,2 (giọng tự nhiên) xuống 1,79 (gần sóng vuông). ĐỪNG dùng lại tanh
-   cho giọng.
-   Cách hiện tại: cân mức từng mẩu → cắt bass (không giúp nghe rõ mà ngốn biên độ) → nhấn dải
-   2,6kHz (dải quyết định nghe rõ giữa tiếng máy) → nén nhẹ → chặn đỉnh → hệ số an toàn dò sẵn
-   cho đỉnh ≤ 0,92. Đo: to hơn ~6dB, riêng dải giọng rõ hơn ~3,8dB, tỷ lệ đỉnh/trung bình giữ
-   >3,1 nên không rè. */
-const VOICE_LEVELS = {
-    vua: { hp: 140, presence: 6, th: -20, ratio: 4, makeup: 1.8, safe: 0.50 },
-    to: { hp: 140, presence: 6, th: -20, ratio: 4, makeup: 1.8, safe: 0.874 },
-    ratto: { hp: 120, presence: 3, th: -24, ratio: 6, makeup: 2.2, safe: 0.859 }
-}
-let voiceLevel = localStorage.getItem("woodMeasureVoiceLevel") || "to"
-let audioCtx = null
-let voiceBuffers = {}   // tên mẩu → { buffer, offset, dur } (đã cắt khoảng lặng)
-let voiceLoading = null
-
-function ensureAudioCtx() {
-    // iOS chỉ cho tạo/mở khoá âm thanh trong lúc người dùng chạm màn hình
-    try {
-        const AC = window.AudioContext || window.webkitAudioContext
-        if (!AC) return null
-        if (!audioCtx) audioCtx = new AC()
-        if (audioCtx.state === "suspended") audioCtx.resume().catch(() => { })
-        return audioCtx
-    } catch (e) { return null }
-}
-
-// Bỏ khoảng lặng đầu/cuối của mỗi mẩu — file gốc dài 1,8s mà tiếng nói chỉ ~0,2s,
-// không cắt thì đọc "hai bảy" mất mấy giây.
-function trimSilence(buf) {
-    const d = buf.getChannelData(0), TH = 0.008
-    let s = 0, e = d.length - 1
-    while (s < d.length && Math.abs(d[s]) < TH) s++
-    while (e > s && Math.abs(d[e]) < TH) e--
-    const pad = Math.round(buf.sampleRate * 0.02)
-    const off = Math.max(0, s - pad)
-    const end = Math.min(d.length - 1, e + pad)
-    let peak = 0
-    for (let i = s; i <= e; i++) { const a = Math.abs(d[i]); if (a > peak) peak = a }
-    return { buffer: buf, offset: off / buf.sampleRate, dur: Math.max(0.05, (end - off) / buf.sampleRate), peak }
-}
-
-function loadVoicePack() {
-    if (voiceLoading) return voiceLoading
-    const ctx = ensureAudioCtx()
-    if (!ctx) return Promise.reject(new Error("no-audio"))
-    voiceLoading = Promise.all(VOICE_WORDS.map(w =>
-        fetch("voice/" + w + ".mp3")
-            .then(r => r.arrayBuffer())
-            .then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej)))
-            .then(buf => { voiceBuffers[w] = trimSilence(buf) })
-    )).catch(e => { voiceLoading = null; throw e })
-    return voiceLoading
-}
-
-// Dựng chuỗi xử lý tiếng, trả về node đầu vào. Tách riêng để test được bằng OfflineAudioContext.
-function buildVoiceChain(ctx, lv) {
-    const hp = ctx.createBiquadFilter()
-    hp.type = "highpass"; hp.frequency.value = lv.hp; hp.Q.value = 0.7
-    let node = hp
-    if (lv.presence) {
-        const pk = ctx.createBiquadFilter()
-        pk.type = "peaking"; pk.frequency.value = 2600; pk.Q.value = 1.0; pk.gain.value = lv.presence
-        node.connect(pk); node = pk
-    }
-    const comp = ctx.createDynamicsCompressor()
-    comp.threshold.value = lv.th; comp.ratio.value = lv.ratio
-    comp.knee.value = 12; comp.attack.value = 0.005; comp.release.value = 0.15
-    node.connect(comp); node = comp
-    const mk = ctx.createGain(); mk.gain.value = lv.makeup
-    node.connect(mk); node = mk
-    const lim = ctx.createDynamicsCompressor()   // chặn đỉnh, không cho vượt trần loa
-    lim.threshold.value = -4; lim.ratio.value = 20
-    lim.knee.value = 0; lim.attack.value = 0.0005; lim.release.value = 0.06
-    node.connect(lim); node = lim
-    const safe = ctx.createGain(); safe.gain.value = lv.safe
-    node.connect(safe); safe.connect(ctx.destination)
-    return hp
-}
-
-// Số → danh sách mẩu tiếng. Giữ NGUYÊN cách đọc tắt của bản cũ (27 = "hai bảy", 21 = "hai mốt")
-function numberToVoiceTokens(n) {
-    const intTokens = (num) => {
-        if (num < 10) return [VOICE_DIGITS[num]]
-        if (num === 10) return ["muoi"]
-        if (num < 20) return ["muoi", VOICE_DIGITS[num % 10]]
-        const tens = Math.floor(num / 10), unit = num % 10
-        if (unit === 0) return [VOICE_DIGITS[tens], "muoi2"]
-        if (unit === 1) return [VOICE_DIGITS[tens], "mot2"]
-        return [VOICE_DIGITS[tens], VOICE_DIGITS[unit]]
-    }
-    const s = n.toString()
-    if (!s.includes(".")) return intTokens(parseInt(s))
-    const parts = s.split(".")
-    return intTokens(parseInt(parts[0]))
-        .concat(["phay"], parts[1].split("").map(d => VOICE_DIGITS[+d]))
-}
-
-function playVoiceTokens(tokens) {
-    const ctx = ensureAudioCtx()
-    if (!ctx || ctx.state !== "running") return false
-    if (tokens.some(t => !voiceBuffers[t])) return false
-    const lv = VOICE_LEVELS[voiceLevel] || VOICE_LEVELS.to
-    const input = buildVoiceChain(ctx, lv)
-    let t = ctx.currentTime + 0.02
-    tokens.forEach(tk => {
-        const v = voiceBuffers[tk]
-        const src = ctx.createBufferSource()
-        src.buffer = v.buffer
-        // cân mức từng mẩu về cùng độ to (file gốc chênh nhau) — tăng được ~6dB mà không méo
-        const norm = ctx.createGain()
-        norm.gain.value = Math.min(4, 0.9 / (v.peak || 0.5))
-        src.connect(norm); norm.connect(input)
-        src.start(t, v.offset, v.dur)
-        t += v.dur - 0.03   // chồng nhẹ cho liền mạch, khỏi nghe rời rạc
-    })
-    return true
-}
-
-function speakSystem(n) {   // đường lui: giọng của hệ điều hành (như bản cũ)
+/* SPEAK */
+function speakNumber(n) {
     if (!window.speechSynthesis) return
     speechSynthesis.cancel()
-    const digits = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"]
-    const map = { khong: "không", mot: "một", hai: "hai", ba: "ba", bon: "bốn", nam: "năm", sau: "sáu", bay: "bảy", tam: "tám", chin: "chín", muoi: "mười", muoi2: "mươi", mot2: "mốt", phay: "phẩy" }
-    void digits
-    const text = numberToVoiceTokens(n).map(t => map[t]).join(" ")
-    const utter = new SpeechSynthesisUtterance(text)
+    const digits = [
+        "không", "một", "hai", "ba", "bốn",
+        "năm", "sáu", "bảy", "tám", "chín"
+    ]
+    function readInt(num) {
+        if (num < 10) return digits[num]
+        if (num == 10) return "mười"
+        if (num < 20) {
+            return "mười " + digits[num % 10]
+        }
+        let tens = Math.floor(num / 10)
+        let unit = num % 10
+        if (unit == 0) return digits[tens] + " mươi"
+        if (unit == 1) return digits[tens] + " mốt"
+        return digits[tens] + " " + digits[unit]
+    }
+    let text = ""
+    let s = n.toString()
+    if (s.includes(".")) {
+        let parts = s.split(".")
+        text = readInt(parseInt(parts[0])) + " phẩy " +
+            parts[1].split("").map(d => digits[d]).join(" ")
+    } else {
+        text = readInt(parseInt(s))
+    }
+    let utter = new SpeechSynthesisUtterance(text)
     utter.lang = "vi-VN"
     utter.rate = 1.3
-    utter.volume = 1
     speechSynthesis.speak(utter)
-}
-
-function speakNumber(n) {
-    const tokens = numberToVoiceTokens(n)
-    if (playVoiceTokens(tokens)) return
-    // chưa tải xong bộ giọng → đọc tạm bằng giọng máy, đồng thời tải nền cho lần sau
-    speakSystem(n)
-    loadVoicePack().catch(() => { })
-}
-
-function setVoiceLevel(lv) {
-    voiceLevel = lv
-    localStorage.setItem("woodMeasureVoiceLevel", lv)
-    document.querySelectorAll("#voiceLevelRow button[data-lv]").forEach(b => {
-        b.classList.toggle("selected", b.dataset.lv === lv)
-    })
-    ensureAudioCtx()
-    loadVoicePack().then(() => speakNumber(27.5)).catch(() => speakSystem(27.5))
 }
 
 /* GRID */
@@ -1205,10 +1078,6 @@ function toggleWoodUS() {
 
 /* START */
 async function startMeasure() {
-    // Bấm nút này là thao tác tay → tranh thủ mở khoá âm thanh (iOS bắt buộc) và nạp bộ giọng
-    // trước khi vào màn đo, để lần bấm số đầu tiên đã đọc bằng giọng thu sẵn.
-    ensureAudioCtx()
-    loadVoicePack().catch(() => { })
     if (bundle.value.trim() == "") {
         alert("Vui lòng nhập mã kiện")
         bundle.focus()
@@ -1813,10 +1682,6 @@ window.addEventListener("load", async function () {
     rebuild()
     updateSummary()
     renderList()
-    // đánh dấu mức tiếng đang chọn (chỉ tô nút, không phát thử lúc mở app)
-    document.querySelectorAll("#voiceLevelRow button[data-lv]").forEach(b => {
-        b.classList.toggle("selected", b.dataset.lv === voiceLevel)
-    })
     /* Nếu đang có session → lưu & vào Measure */
     if (boards.length > 0 && bundle.value.trim() !== "") {
         saveCurrentSession()
