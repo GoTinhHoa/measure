@@ -180,7 +180,13 @@ button:active {
     z-index: 99999;
     font-size: 14px;
     font-weight: 600;
-    white-space: nowrap;
+    /* Câu dài (lý do lỗi đồng bộ) tự xuống dòng, không tràn ra 2 mép màn hình */
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.35;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
     letter-spacing: 0.1px;
 }

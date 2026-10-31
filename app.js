@@ -569,6 +569,12 @@ function buildSyncRow() {
     }
 }
 
+// So 2 danh sách tấm theo dài × rộng (không tính thứ tự / lượt đo)
+function sameBoards(a, b) {
+    let key = list => (Array.isArray(list) ? list : []).map(x => x.l + "x" + x.w).sort().join(",")
+    return key(a) === key(b)
+}
+
 function isNetworkError(msg) {
     return !navigator.onLine || /fetch|network|load failed|abort|timeout|timed out|connection/i.test(msg || "")
 }
@@ -582,16 +588,18 @@ async function pushMeasurementRow(row) {
         // chia sẻ lại phiên cũ upsert ép status về "chờ gán" → phiếu đã bán quay lại pool
         // chờ gán (không hoàn kho, không dấu vết) → nguy cơ gán bán lần 2
         let { data: existing, error: exErr } = await sb.from("bundle_measurements")
-            .select("id, status, deleted, order_id").eq("session_id", row.session_id)
+            .select("id, status, deleted, order_id, boards").eq("session_id", row.session_id)
             .abortSignal(ctl.signal).maybeSingle()
         if (exErr) return { ok: false, kind: isNetworkError(exErr.message) ? "net" : "db", reason: exErr.message }
-        // splittable: phiên bị khoá → có thể tách danh sách hiện tại thành phiếu mới (splitToNewSession)
+        // Phiên bị khoá: danh sách GIỐNG HỆT phiếu trên hệ thống (chỉ chia sẻ lại ảnh) → unchanged, không
+        // được đề nghị tách (tách = phiếu trùng → nguy cơ bán 2 lần); CÓ sửa → splittable (splitToNewSession)
         if (existing) {
+            let unchanged = sameBoards(existing.boards, row.boards)
             if (existing.status !== "chờ gán") {
-                return { ok: false, kind: "blocked", splittable: true, short: "phiếu đã gán đơn", reason: 'Phiếu này đã được gán vào đơn hàng — không thể gửi lại. Bấm "Kiện mới" để đo phiếu khác' }
+                return { ok: false, kind: "blocked", assigned: true, unchanged, splittable: !unchanged, short: "phiếu đã gán đơn", reason: "Phiếu này đã nằm trong đơn hàng, không sửa được nữa" }
             }
             if (existing.deleted && existing.order_id) {
-                return { ok: false, kind: "blocked", splittable: true, short: "phiếu đã bị vô hiệu", reason: 'Phiếu này đã bị vô hiệu trên hệ thống — bấm "Kiện mới" để đo phiếu khác' }
+                return { ok: false, kind: "blocked", unchanged, splittable: !unchanged, short: "phiếu đã bị vô hiệu", reason: "Phiếu này đã bị vô hiệu trên hệ thống" }
             }
             // Phiếu "chờ gán" chưa dính đơn (kể cả bị xóa nhầm khỏi pool) → cho gửi lại bình thường
         }
@@ -737,7 +745,7 @@ async function flushSyncQueue(manual) {
         for (let item of q) {
             let res = await pushMeasurementRow(item.row)
             if (res.ok) { sent++; dequeueSync(item.row.session_id) }
-            else if (res.kind === "blocked") { blocked.push(item.row.bundle_code); dequeueSync(item.row.session_id) }
+            else if (res.kind === "blocked") { if (!res.unchanged) blocked.push(item.row.bundle_code); dequeueSync(item.row.session_id) }
             else lastErr = res.reason
         }
     } finally {
@@ -1791,10 +1799,11 @@ async function shareMatrixZalo() {
     // Phiên này đã gán đơn (sửa tiếp thay vì bấm "Kiện mới") → đề nghị tách thành phiếu mới
     if (!syncResult.ok && syncResult.splittable) {
         let split = await confirmAsync(
-            "Phiếu cũ đã gán vào đơn",
-            "Phiếu đo trước của kiện " + bundle.value.trim() + " đã được gán vào đơn hàng (hoặc bị vô hiệu) nên không sửa được nữa.\n\n" +
-            "Xác nhận = gửi " + boards.length + " tấm này thành PHIẾU MỚI (phiếu cũ trên đơn giữ nguyên — báo bán hàng nếu cần gỡ).\n" +
-            "Hủy = chỉ chia sẻ ảnh, KHÔNG gửi lên hệ thống."
+            "Phiếu đã nằm trong đơn hàng",
+            "Kiện " + bundle.value.trim() + ": phiếu đo này đã được gán vào đơn (hoặc bị vô hiệu), danh sách vừa sửa không cập nhật vào đơn được.\n\n" +
+            "• Xác nhận: gửi " + boards.length + " tấm này thành PHIẾU MỚI.\n" +
+            "• Hủy: chỉ chia sẻ ảnh, không gửi lên hệ thống.\n\n" +
+            "Nếu chỉ muốn sửa phiếu trong đơn: bấm Hủy, báo bán hàng gỡ phiếu khỏi đơn rồi chia sẻ lại."
         )
         if (split) {
             splitToNewSession()
@@ -1803,6 +1812,7 @@ async function shareMatrixZalo() {
         }
     }
     if (syncResult.ok) showToast("Đã đồng bộ ✓", "success")
+    else if (syncResult.assigned && syncResult.unchanged) showToast("Phiếu đã nằm trong đơn hàng — chỉ chia sẻ lại ảnh", "success", 4000)
     else if (syncResult.queued) showToast("⚠ Chưa đồng bộ (" + syncResult.reason + ") — đã lưu, máy sẽ tự gửi lại khi có mạng", "error", 6000)
     else showToast("⚠ Chưa đồng bộ: " + syncResult.reason, "error", 6000)
 
@@ -1829,7 +1839,8 @@ async function shareMatrixZalo() {
 
         /* Nếu sync fail → chèn dòng cảnh báo nhỏ vào ảnh để quản trị viên biết */
         let syncWarn = null
-        if (!syncResult.ok) {
+        // Chia sẻ lại đúng phiếu đã gán đơn (không sửa gì) là bình thường → không chèn cảnh báo
+        if (!syncResult.ok && !(syncResult.assigned && syncResult.unchanged)) {
             syncWarn = document.createElement("div")
             // Ghi rõ lý do trong ảnh — admin xem Zalo là biết mất mạng hay bị chặn
             let why = syncResult.kind === "net" ? "mất mạng — máy đã lưu, tự gửi lại khi có sóng"
