@@ -68,12 +68,14 @@ function updateTurnSelect() {
 }
 
 /* TOAST */
-function showToast(msg, type = "success") {
+let toastTimer = null
+function showToast(msg, type = "success", ms = 2500) {
     let t = document.getElementById("toast")
     t.innerText = msg
     t.className = "toast " + type
     t.style.display = "block"
-    setTimeout(() => { t.style.display = "none" }, 2500)
+    clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => { t.style.display = "none" }, ms)
 }
 
 /* CONFIRM MODAL */
@@ -538,51 +540,159 @@ function calcVolume() {
     return calcVolumeFromBoards(boards, thickness.value)
 }
 
-async function syncToSystem() {
-    if (!currentUser) return { ok: false, reason: "Chưa đăng nhập (thiếu tên người đo)" }
-    if (!currentSessionId || boards.length === 0) return { ok: false, reason: "Chưa có dữ liệu để đồng bộ" }
+/* Đồng bộ phiếu đo — ca A1088 31/10/2026: phiếu 17 tấm KHÔNG lên hệ thống dù ảnh vẫn gửi Zalo được
+   (Zalo tự giữ tin gửi sau, còn app chỉ gửi 1 lần, lỗi là mất; lý do chỉ hiện toast 4 giây).
+   Nay: mỗi lần gửi tối đa SYNC_TIMEOUT_MS, lỗi mạng thì thử lại; vẫn lỗi → xếp hàng trong máy,
+   tự gửi lại khi có mạng / mở app / mỗi phút, và có thanh "phiếu chưa gửi" để bấm gửi lại. */
+const SYNC_TIMEOUT_MS = 10000
+const SYNC_RETRY_DELAYS = [2000, 5000] // thử tối đa 3 lần
+const SYNC_QUEUE_KEY = "woodSyncQueue"
+
+// Chụp phiếu đang mở thành dòng bundle_measurements (giữ nguyên để gửi lại đúng cái đã chia sẻ)
+function buildSyncRow() {
+    return {
+        session_id: currentSessionId,
+        bundle_code: bundle.value.trim(),
+        wood_type: woodType.value.trim(),
+        wood_id: selectedWoodId || null,
+        thickness: parseFloat(thickness.value) || 0,
+        quality: quality.value.trim(),
+        boards: boards,
+        board_count: boards.length,
+        volume: calcVolume(),
+        measured_by: currentUser,
+        measurement_type: currentMeasurementType,
+        bundle_check: document.getElementById("bundleStatus").value || "-",
+        mismatch_count: getMismatchCount(),
+        status: "chờ gán",
+        deleted: false
+    }
+}
+
+function isNetworkError(msg) {
+    return !navigator.onLine || /fetch|network|load failed|abort|timeout|timed out|connection/i.test(msg || "")
+}
+
+// Gửi 1 lần. kind: "net" (mạng — nên thử lại) | "blocked" (guard từ chối — KHÔNG gửi lại) | "db" (lỗi hệ thống)
+async function pushMeasurementRow(row) {
+    let ctl = new AbortController()
+    let timer = setTimeout(() => ctl.abort(), SYNC_TIMEOUT_MS)
     try {
         // Phiếu đã gán vào đơn / đã bị vô hiệu thì KHÔNG được ghi đè — bug A2037 25/07/2026:
         // chia sẻ lại phiên cũ upsert ép status về "chờ gán" → phiếu đã bán quay lại pool
         // chờ gán (không hoàn kho, không dấu vết) → nguy cơ gán bán lần 2
         let { data: existing, error: exErr } = await sb.from("bundle_measurements")
-            .select("id, status, deleted, order_id").eq("session_id", currentSessionId).maybeSingle()
-        if (exErr) return { ok: false, reason: exErr.message }
+            .select("id, status, deleted, order_id").eq("session_id", row.session_id)
+            .abortSignal(ctl.signal).maybeSingle()
+        if (exErr) return { ok: false, kind: isNetworkError(exErr.message) ? "net" : "db", reason: exErr.message }
         if (existing) {
             if (existing.status !== "chờ gán") {
-                return { ok: false, reason: 'Phiếu này đã được gán vào đơn hàng — không thể gửi lại. Bấm "Kiện mới" để đo phiếu khác' }
+                return { ok: false, kind: "blocked", short: "phiếu đã gán đơn", reason: 'Phiếu này đã được gán vào đơn hàng — không thể gửi lại. Bấm "Kiện mới" để đo phiếu khác' }
             }
             if (existing.deleted && existing.order_id) {
-                return { ok: false, reason: 'Phiếu này đã bị vô hiệu trên hệ thống — bấm "Kiện mới" để đo phiếu khác' }
+                return { ok: false, kind: "blocked", short: "phiếu đã bị vô hiệu", reason: 'Phiếu này đã bị vô hiệu trên hệ thống — bấm "Kiện mới" để đo phiếu khác' }
             }
             // Phiếu "chờ gán" chưa dính đơn (kể cả bị xóa nhầm khỏi pool) → cho gửi lại bình thường
         }
         // session_id unique per kiện (tạo 1 lần khi startMeasure, reset khi "Kiện mới")
         // Cùng session chia sẻ lại → upsert update (cập nhật số tấm/khối lượng)
         // Khác session cùng mã kiện → tạo record mới (soạn lẻ cho khách khác)
-        let { error } = await sb.from("bundle_measurements").upsert({
-            session_id: currentSessionId,
-            bundle_code: bundle.value.trim(),
-            wood_type: woodType.value.trim(),
-            wood_id: selectedWoodId || null,
-            thickness: parseFloat(thickness.value) || 0,
-            quality: quality.value.trim(),
-            boards: boards,
-            board_count: boards.length,
-            volume: calcVolume(),
-            measured_by: currentUser,
-            measurement_type: currentMeasurementType,
-            bundle_check: document.getElementById("bundleStatus").value || "-",
-            mismatch_count: getMismatchCount(),
-            status: "chờ gán",
-            deleted: false,
-            updated_at: new Date().toISOString()
-        }, { onConflict: "session_id" })
-        if (error) return { ok: false, reason: error.message }
+        let { error } = await sb.from("bundle_measurements")
+            .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: "session_id" })
+            .abortSignal(ctl.signal)
+        if (error) return { ok: false, kind: isNetworkError(error.message) ? "net" : "db", reason: error.message }
         return { ok: true }
     } catch (e) {
-        return { ok: false, reason: e.message || "Lỗi kết nối" }
+        return { ok: false, kind: "net", reason: e.message || "Lỗi kết nối" }
+    } finally {
+        clearTimeout(timer)
     }
+}
+
+async function syncToSystem() {
+    if (!currentUser) return { ok: false, kind: "blocked", short: "chưa đăng nhập", reason: "Chưa đăng nhập (thiếu tên người đo)" }
+    if (!currentSessionId || boards.length === 0) return { ok: false, kind: "blocked", short: "chưa có dữ liệu", reason: "Chưa có dữ liệu để đồng bộ" }
+    let row = buildSyncRow()
+    let res
+    for (let i = 0; ; i++) {
+        res = await pushMeasurementRow(row)
+        if (res.ok || res.kind !== "net" || i >= SYNC_RETRY_DELAYS.length) break
+        await new Promise(r => setTimeout(r, SYNC_RETRY_DELAYS[i]))
+    }
+    if (res.ok || res.kind === "blocked") {
+        dequeueSync(row.session_id)
+    } else {
+        enqueueSync(row)
+        res.queued = true
+    }
+    return res
+}
+
+/* Hàng đợi phiếu chưa gửi được (localStorage, 1 phiếu/session — bản mới thay bản cũ) */
+function getSyncQueue() {
+    try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY)) || [] } catch { return [] }
+}
+function setSyncQueue(q) {
+    try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)) } catch {}
+    renderSyncQueueBar()
+}
+function enqueueSync(row) {
+    let q = getSyncQueue().filter(x => x.row.session_id !== row.session_id)
+    q.push({ row, queuedAt: Date.now() })
+    setSyncQueue(q)
+}
+function dequeueSync(sessionId) {
+    let q = getSyncQueue()
+    if (q.some(x => x.row.session_id === sessionId)) setSyncQueue(q.filter(x => x.row.session_id !== sessionId))
+}
+
+let syncFlushing = false
+async function flushSyncQueue(manual) {
+    if (syncFlushing) return
+    let q = getSyncQueue()
+    if (!q.length) return
+    syncFlushing = true
+    renderSyncQueueBar()
+    let sent = 0, blocked = [], lastErr = ""
+    try {
+        for (let item of q) {
+            let res = await pushMeasurementRow(item.row)
+            if (res.ok) { sent++; dequeueSync(item.row.session_id) }
+            else if (res.kind === "blocked") { blocked.push(item.row.bundle_code); dequeueSync(item.row.session_id) }
+            else lastErr = res.reason
+        }
+    } finally {
+        syncFlushing = false
+        renderSyncQueueBar()
+    }
+    if (sent) showToast("Đã gửi bù " + sent + " phiếu lên hệ thống ✓", "success")
+    if (blocked.length) showToast("Bỏ phiếu " + blocked.join(", ") + ": đã gán đơn / bị vô hiệu trên hệ thống", "warning", 5000)
+    else if (manual && lastErr) showToast("⚠ Vẫn chưa gửi được: " + lastErr, "error", 5000)
+}
+
+function renderSyncQueueBar() {
+    let q = getSyncQueue()
+    document.querySelectorAll(".syncQueueBar").forEach(el => {
+        el.style.display = q.length ? "" : "none"
+        el.innerText = syncFlushing
+            ? "⏳ Đang gửi lại " + q.length + " phiếu..."
+            : "⚠ " + q.length + " phiếu chưa lên hệ thống (" + q.map(x => x.row.bundle_code).join(", ") + ") — bấm để gửi lại"
+    })
+}
+
+function initSyncQueue() {
+    // Thanh báo ngay dưới header của mọi màn
+    document.querySelectorAll(".screen > .header").forEach(h => {
+        let bar = document.createElement("div")
+        bar.className = "syncQueueBar"
+        bar.style.display = "none"
+        bar.onclick = () => flushSyncQueue(true)
+        h.insertAdjacentElement("afterend", bar)
+    })
+    renderSyncQueueBar()
+    window.addEventListener("online", () => flushSyncQueue(false))
+    setInterval(() => flushSyncQueue(false), 60000)
+    flushSyncQueue(false)
 }
 
 /* Measurement type toggle */
@@ -1595,9 +1705,11 @@ async function shareMatrixZalo() {
     // Đồng bộ lên hệ thống TRƯỚC khi chia sẻ (không phụ thuộc share thành công)
     // Cả 2 mode đều sync: order_split → PgSales "DS kiện lẻ vừa soạn",
     // whole_bundle → PgKiln "mẻ xếp" (filter measurement_type)
+    showToast("Đang đồng bộ...", "warning", 30000)
     let syncResult = await syncToSystem()
     if (syncResult.ok) showToast("Đã đồng bộ ✓", "success")
-    else showToast("⚠ Chưa đồng bộ: " + syncResult.reason, "error")
+    else if (syncResult.queued) showToast("⚠ Chưa đồng bộ (" + syncResult.reason + ") — đã lưu, máy sẽ tự gửi lại khi có mạng", "error", 6000)
+    else showToast("⚠ Chưa đồng bộ: " + syncResult.reason, "error", 6000)
 
     try {
         let el = document.getElementById("matrixCaptureArea")
@@ -1624,7 +1736,11 @@ async function shareMatrixZalo() {
         let syncWarn = null
         if (!syncResult.ok) {
             syncWarn = document.createElement("div")
-            syncWarn.innerText = "⚠ CHƯA ĐỒNG BỘ HỆ THỐNG — báo quản trị viên kiểm tra"
+            // Ghi rõ lý do trong ảnh — admin xem Zalo là biết mất mạng hay bị chặn
+            let why = syncResult.kind === "net" ? "mất mạng — máy đã lưu, tự gửi lại khi có sóng"
+                : syncResult.kind === "blocked" ? (syncResult.short || syncResult.reason)
+                : "lỗi hệ thống: " + String(syncResult.reason || "").slice(0, 60)
+            syncWarn.innerText = "⚠ CHƯA ĐỒNG BỘ HỆ THỐNG (" + why + ") — báo quản trị viên kiểm tra"
             syncWarn.style.cssText = "font-size:11px;font-weight:700;color:#B91C1C;background:#FEE2E2;padding:4px 8px;border-radius:4px;margin-top:6px;text-align:center"
             el.appendChild(syncWarn)
         }
@@ -1673,6 +1789,7 @@ window.addEventListener("load", async function () {
     }
     await verifySavedAccess()
     loadWoodTypes()
+    initSyncQueue()
     accessInput.addEventListener("keypress", function (e) {
         if (e.key === "Enter") {
             checkAccessCode()

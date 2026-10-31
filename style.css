@@ -42,6 +42,18 @@ html, body {
     opacity: 0.9;
 }
 
+/* Phiếu đo chưa lên hệ thống (hàng đợi gửi lại) — bấm để gửi lại */
+.syncQueueBar {
+    background: #FEE2E2;
+    color: #B91C1C;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #FCA5A5;
+}
+
 .appVersionPill {
     position: absolute;
     right: 12px;

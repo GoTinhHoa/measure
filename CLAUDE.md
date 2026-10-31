@@ -39,6 +39,8 @@ Xác thực bằng bảng `measure_devices` (`code`, `user_name`, `default_type`
 
 **Guard chống ghi đè phiếu đã gán (26/07/2026)**: trước khi upsert, `syncToSystem` SELECT phiếu theo `session_id` — nếu phiếu đã `status='đã gán'` hoặc `deleted=true` thì TỪ CHỐI sync (toast báo lý do), không ghi đè. Bug cũ (ca kiện A2037 25/07): chia sẻ lại phiên cũ upsert ép status về "chờ gán" → phiếu đã bán quay lại pool chờ gán của PgSales, không hoàn kho, gây nguy cơ bán trùng. KHÔNG bỏ guard này khi sửa syncToSystem.
 
+**Thử lại + hàng đợi (v25, 31/10/2026)**: ca A1088 — phiếu 17 tấm không lên hệ thống dù ảnh vẫn gửi Zalo được (Zalo tự giữ tin gửi sau; app cũ gửi 1 lần, lỗi là mất, lý do chỉ hiện toast 4s) → bán hàng gán nhầm phiếu cũ 45 tấm. Nay `pushMeasurementRow` giới hạn 10s/lần, lỗi mạng thử lại 3 lần; vẫn lỗi → `woodSyncQueue` (localStorage, 1 phiếu/session) tự gửi lại khi `online` / mở app / mỗi 60s, thanh đỏ `.syncQueueBar` dưới header để bấm gửi lại. Guard từ chối (`kind:"blocked"`) thì KHÔNG xếp hàng. Ảnh chia sẻ ghi rõ lý do (mất mạng / phiếu đã gán / lỗi hệ thống). Service worker KHÔNG chặn request Supabase và request không phải GET.
+
 ## Đọc số khi chọn Dài/Rộng — đã thử giọng thu sẵn rồi BỎ (13-08-2026)
 
 `speakNumber()` dùng giọng của hệ điều hành (Web Speech), `rate 1.3`. **Tốc độ 1.3 là cố ý** —
