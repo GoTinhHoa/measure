@@ -585,12 +585,13 @@ async function pushMeasurementRow(row) {
             .select("id, status, deleted, order_id").eq("session_id", row.session_id)
             .abortSignal(ctl.signal).maybeSingle()
         if (exErr) return { ok: false, kind: isNetworkError(exErr.message) ? "net" : "db", reason: exErr.message }
+        // splittable: phiên bị khoá → có thể tách danh sách hiện tại thành phiếu mới (splitToNewSession)
         if (existing) {
             if (existing.status !== "chờ gán") {
-                return { ok: false, kind: "blocked", short: "phiếu đã gán đơn", reason: 'Phiếu này đã được gán vào đơn hàng — không thể gửi lại. Bấm "Kiện mới" để đo phiếu khác' }
+                return { ok: false, kind: "blocked", splittable: true, short: "phiếu đã gán đơn", reason: 'Phiếu này đã được gán vào đơn hàng — không thể gửi lại. Bấm "Kiện mới" để đo phiếu khác' }
             }
             if (existing.deleted && existing.order_id) {
-                return { ok: false, kind: "blocked", short: "phiếu đã bị vô hiệu", reason: 'Phiếu này đã bị vô hiệu trên hệ thống — bấm "Kiện mới" để đo phiếu khác' }
+                return { ok: false, kind: "blocked", splittable: true, short: "phiếu đã bị vô hiệu", reason: 'Phiếu này đã bị vô hiệu trên hệ thống — bấm "Kiện mới" để đo phiếu khác' }
             }
             // Phiếu "chờ gán" chưa dính đơn (kể cả bị xóa nhầm khỏi pool) → cho gửi lại bình thường
         }
@@ -601,6 +602,7 @@ async function pushMeasurementRow(row) {
             .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: "session_id" })
             .abortSignal(ctl.signal)
         if (error) return { ok: false, kind: isNetworkError(error.message) ? "net" : "db", reason: error.message }
+        markSessionSynced(row.session_id)
         return { ok: true }
     } catch (e) {
         return { ok: false, kind: "net", reason: e.message || "Lỗi kết nối" }
@@ -626,6 +628,83 @@ async function syncToSystem() {
         res.queued = true
     }
     return res
+}
+
+/* Sửa phiên đã gán đơn — ca A1088 31/10/2026: phiếu 45 tấm đã gán đơn, thợ KHÔNG bấm "Kiện mới"
+   mà xoá tấm trên chính phiên đó còn 17 tấm rồi chia sẻ → guard chặn, phiếu 17 tấm không lên
+   hệ thống, bán hàng không thấy. Nay: (1) sửa tấm trên phiên đã từng gửi → hỏi hệ thống, nếu đã
+   gán đơn thì báo ngay + đề nghị tách phiếu mới; (2) chia sẻ bị guard chặn → hỏi tách phiếu mới.
+   Tách = cấp session_id mới → phiếu "chờ gán" mới, phiếu cũ trên đơn giữ nguyên (bán hàng tự xử lý). */
+const SYNCED_SESSIONS_KEY = "woodSyncedSessions"
+function getSyncedSessions() {
+    try { return JSON.parse(localStorage.getItem(SYNCED_SESSIONS_KEY)) || [] } catch { return [] }
+}
+function markSessionSynced(sid) {
+    let list = getSyncedSessions().filter(x => x !== sid)
+    list.push(sid)
+    try { localStorage.setItem(SYNCED_SESSIONS_KEY, JSON.stringify(list.slice(-50))) } catch {}
+}
+
+function splitToNewSession() {
+    let oldSid = currentSessionId
+    currentSessionId = Date.now()
+    leHetOkCount = -1
+    saveState()
+    saveCurrentSession()
+    restoreSavedFromServer(oldSid)
+}
+
+// saveState tự ghi danh sách đang sửa vào lịch sử phiên cũ → trước khi tách, mục lịch sử cũ đã bị
+// ghi đè (VD 45 → 17 tấm). Lấy lại bản trên hệ thống (bản đã gán đơn) trả về cho mục lịch sử cũ.
+async function restoreSavedFromServer(sid) {
+    try {
+        let { data } = await sb.from("bundle_measurements").select("boards").eq("session_id", sid).maybeSingle()
+        if (!Array.isArray(data?.boards) || !data.boards.length) return
+        let lists = getSavedLists()
+        let s = lists.find(x => x.id === sid)
+        if (!s) return
+        s.boards = data.boards
+        s.currentTurn = Math.max(1, ...data.boards.map(b => b.turn || 1))
+        saveLists(lists)
+    } catch {}
+}
+
+// Promise hoá confirm modal: true = Xác nhận, false = Hủy
+function confirmAsync(title, desc) {
+    return new Promise(resolve => {
+        let cancelBtn = document.querySelector("#confirmModal .btnCancel")
+        let prev = cancelBtn.onclick
+        cancelBtn.onclick = () => { cancelBtn.onclick = prev; closeConfirm(); resolve(false) }
+        showConfirm(title, desc, () => { cancelBtn.onclick = prev; resolve(true) })
+    })
+}
+
+let lockCheckAt = {} // session_id → lần hỏi hệ thống gần nhất (ms)
+let lockWarnedSid = null // đã cảnh báo + thợ chọn Hủy → không hỏi lại phiên này
+async function checkEditOnLockedSession() {
+    let sid = currentSessionId
+    // Chỉ phiên đã từng gửi lên mới có thể bị gán → phiên đo mới không tốn request nào
+    if (!sid || sid === lockWarnedSid || !getSyncedSessions().includes(sid)) return
+    if (Date.now() - (lockCheckAt[sid] || 0) < 60000) return
+    lockCheckAt[sid] = Date.now()
+    try {
+        let { data } = await sb.from("bundle_measurements")
+            .select("status, deleted, order_id, board_count").eq("session_id", sid).maybeSingle()
+        let locked = data && (data.status !== "chờ gán" || (data.deleted && data.order_id))
+        if (!locked || sid !== currentSessionId) return
+        let ok = await confirmAsync(
+            "Phiếu này đã gán vào đơn",
+            "Phiếu kiện " + bundle.value.trim() + " (" + data.board_count + " tấm) đã được gán vào đơn hàng — sửa ở đây sẽ KHÔNG cập nhật được đơn.\n\n" +
+            "Xác nhận = tách danh sách đang sửa thành PHIẾU MỚI (phiếu cũ trên đơn giữ nguyên).\n" +
+            "Hủy = để nguyên (khi chia sẻ app sẽ hỏi lại)."
+        )
+        if (ok) {
+            splitToNewSession()
+            showToast("Đã tách thành phiếu mới — chia sẻ để gửi lên hệ thống", "success", 4000)
+        } else {
+            lockWarnedSid = sid
+        }
+    } catch {}
 }
 
 /* Hàng đợi phiếu chưa gửi được (localStorage, 1 phiếu/session — bản mới thay bản cũ) */
@@ -1421,6 +1500,7 @@ function createButtons() {
             let newBoard = { l: selectedLength, w: v, turn: activeTurn }
             if (mismatch) newBoard.mismatch = mismatch
             boards.push(newBoard)
+            checkEditOnLockedSession()
             if (mismatch) {
                 let reason = mismatch === "not_in_original"
                     ? "không có trong kiện gốc"
@@ -1497,6 +1577,7 @@ function deleteBoard(i) {
     updateSummary()
     renderList()
     saveState()
+    checkEditOnLockedSession()
     showUndoToast("Đã xóa tấm " + removed.l + " × " + removed.w, () => {
         boards.splice(i, 0, removed)
         updateSummary()
@@ -1572,7 +1653,7 @@ function resetBoards() {
     go("setup")
     showToast(hadBoards ? "Đã lưu kiện cũ vào lịch sử — bắt đầu kiện mới" : "Đã xóa thông tin — bắt đầu kiện mới", "success")
 }
-function undo() { boards.pop(); updateSummary(); renderList(); saveState() }
+function undo() { boards.pop(); updateSummary(); renderList(); saveState(); checkEditOnLockedSession() }
 
 /* MATRIX */
 function showMatrix() {
@@ -1707,6 +1788,20 @@ async function shareMatrixZalo() {
     // whole_bundle → PgKiln "mẻ xếp" (filter measurement_type)
     showToast("Đang đồng bộ...", "warning", 30000)
     let syncResult = await syncToSystem()
+    // Phiên này đã gán đơn (sửa tiếp thay vì bấm "Kiện mới") → đề nghị tách thành phiếu mới
+    if (!syncResult.ok && syncResult.splittable) {
+        let split = await confirmAsync(
+            "Phiếu cũ đã gán vào đơn",
+            "Phiếu đo trước của kiện " + bundle.value.trim() + " đã được gán vào đơn hàng (hoặc bị vô hiệu) nên không sửa được nữa.\n\n" +
+            "Xác nhận = gửi " + boards.length + " tấm này thành PHIẾU MỚI (phiếu cũ trên đơn giữ nguyên — báo bán hàng nếu cần gỡ).\n" +
+            "Hủy = chỉ chia sẻ ảnh, KHÔNG gửi lên hệ thống."
+        )
+        if (split) {
+            splitToNewSession()
+            showToast("Đang đồng bộ phiếu mới...", "warning", 30000)
+            syncResult = await syncToSystem()
+        }
+    }
     if (syncResult.ok) showToast("Đã đồng bộ ✓", "success")
     else if (syncResult.queued) showToast("⚠ Chưa đồng bộ (" + syncResult.reason + ") — đã lưu, máy sẽ tự gửi lại khi có mạng", "error", 6000)
     else showToast("⚠ Chưa đồng bộ: " + syncResult.reason, "error", 6000)
